@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: school-management-ai
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 7860
+      - key: DB_SCHEMA
+        value: school
+      - key: LLM_PROVIDER
+        value: local
+      - key: DATABASE_URL
+        sync: false
