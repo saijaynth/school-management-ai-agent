@@ -112,6 +112,7 @@ export default function ChatWindow({
               key={i}
               role={m.role}
               content={m.content}
+              thinking={m.thinking}
               failed={m.failed}
               sourceType={showSql ? m.anytime?.source_type : "clarification"}
               sqlQueries={showSql ? m.anytime?.sql_queries ?? [] : []}

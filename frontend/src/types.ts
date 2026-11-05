@@ -21,6 +21,7 @@ export interface ChatResponse {
   manual_references: ManualReference[];
   suggested_followups: string[];
   llm_ready: boolean;
+  thinking?: string;
   elapsed_ms?: number;
 }
 
@@ -46,6 +47,7 @@ export interface SchemaSummaryResponse {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  thinking?: string;
   anytime?: {
     source_type?: SourceType;
     sql_queries?: SqlQueryRecord[];

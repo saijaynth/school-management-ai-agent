@@ -26,13 +26,18 @@ from psycopg_pool import ConnectionPool
 from .config import settings
 
 
-def _connection_options() -> str:
-    return (
-        f"-c search_path={settings.db_schema} "
-        f"-c default_transaction_read_only=on "
-        f"-c statement_timeout={settings.statement_timeout_ms} "
-        f"-c application_name=school-ai-chatbot"
-    )
+def _connection_kwargs() -> dict:
+    kwargs: dict[str, Any] = {"row_factory": dict_row}
+    # Neon PgBouncer pooler rejects all startup parameters in options.
+    # Non-pooled or local databases accept startup options.
+    if "-pooler" not in settings.database_url:
+        kwargs["options"] = (
+            f"-c search_path={settings.db_schema} "
+            f"-c default_transaction_read_only=on "
+            f"-c statement_timeout={settings.statement_timeout_ms} "
+            f"-c application_name=school-ai-chatbot"
+        )
+    return kwargs
 
 
 _pool: Optional[ConnectionPool] = None
@@ -47,10 +52,7 @@ def get_pool() -> ConnectionPool:
                 conninfo=settings.database_url,
                 min_size=settings.db_pool_min,
                 max_size=settings.db_pool_max,
-                kwargs={
-                    "row_factory": dict_row,
-                    "options": _connection_options(),
-                },
+                kwargs=_connection_kwargs(),
                 open=True,
             )
     return _pool
@@ -65,7 +67,13 @@ def db_connection(retries: int = 2) -> Iterator[psycopg.Connection]:
     while attempt <= retries:
         conn = pool.getconn()
         try:
-            conn.execute("SELECT 1")  # sanity + ensures a live connection
+            # Ensure schema search_path, timeout, and read-only mode for every session checkout
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SET search_path TO {settings.db_schema}; "
+                    f"SET default_transaction_read_only = on; "
+                    f"SET statement_timeout = '{settings.statement_timeout_ms}ms';"
+                )
             yield conn
             return
         except psycopg.Error as err:

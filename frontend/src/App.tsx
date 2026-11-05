@@ -45,6 +45,7 @@ export default function App() {
           {
             role: "assistant",
             content: resp.answer,
+            thinking: resp.thinking,
             anytime: {
               source_type: resp.source_type,
               sql_queries: resp.sql_queries,

@@ -1,0 +1,105 @@
+name: ML Training, Evaluation & Deployment Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      min_f1_threshold:
+        description: 'Minimum cross-validation macro F1 threshold'
+        required: false
+        default: '0.90'
+      deploy_to_hf:
+        description: 'Deploy to Hugging Face Spaces after successful verification'
+        type: boolean
+        default: true
+
+jobs:
+  train-and-evaluate:
+    name: Train ML Model & Verify Agent Ground Truth
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://neondb_owner:npg_Ssqzmd9cDo0l@ep-fancy-cell-bd9rqecw-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require' }}
+      DB_SCHEMA: school
+      LLM_PROVIDER: local
+      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Set up Node.js 20 & Build Frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+
+      - name: Build React SPA
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          cd ..
+
+      - name: Execute MLOps Training & Cross-Validation Pipeline
+        run: |
+          python backend/scripts/train_ml_model.py --verify-threshold ${{ github.event.inputs.min_f1_threshold || '0.90' }}
+
+      - name: Verify Neon PostgreSQL Health & Seed Status
+        run: |
+          python backend/scripts/init_db.py --db-url "${{ env.DATABASE_URL }}" --verify-only
+
+      - name: Start FastAPI Background Daemon Server
+        run: |
+          python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 &
+          # Wait for server to warm up and bind port
+          sleep 4
+          curl --retry 5 --retry-connrefused --retry-delay 2 http://127.0.0.1:8000/api/health
+
+      - name: Run 50-Scenario Agent Ground-Truth Verification Suite
+        run: |
+          python backend/scripts/verify_agent.py
+
+      - name: Upload ML Model Artifacts & Evaluation Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-model-and-metrics
+          path: |
+            backend/data/intent_model.joblib
+            backend/data/model_metrics.json
+
+      - name: Publish Trained ML Model to Hugging Face Model Hub
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          HF_TOKEN: ${{ secrets.HF_ACCESS_TOKEN || env.HF_ACCESS_TOKEN }}
+        run: |
+          if [ -n "$HF_TOKEN" ]; then
+            python -c "
+          from huggingface_hub import HfApi
+          api = HfApi(token='$HF_TOKEN')
+          repo_id = 'jaay2/school-management-ml-agent'
+          api.upload_file(path_or_fileobj='backend/data/intent_model.joblib', path_in_repo='intent_model.joblib', repo_id=repo_id, repo_type='model')
+          api.upload_file(path_or_fileobj='backend/data/model_metrics.json', path_in_repo='model_metrics.json', repo_id=repo_id, repo_type='model')
+          print('Successfully published latest model weights to Hugging Face Model Hub!')
+          "
+          else
+            echo "HF_TOKEN not set, skipping HF model publish."
+          fi

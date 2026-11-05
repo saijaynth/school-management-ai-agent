@@ -55,3 +55,4 @@ EXPOSE 7860
 
 # Start unified FastAPI server serving both API and Frontend
 CMD ["sh", "-c", "python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port ${PORT:-7860}"]
+

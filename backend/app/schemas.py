@@ -32,6 +32,7 @@ class ChatResponse(BaseModel):
     manual_references: List[ManualReference] = []
     suggested_followups: List[str] = []
     llm_ready: bool = True
+    thinking: Optional[str] = None
     elapsed_ms: Optional[float] = None
 
 

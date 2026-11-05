@@ -39,6 +39,7 @@ function ManualRefs({ refs }: { refs: ManualReference[] }) {
 export default function MessageBubble({
   role,
   content,
+  thinking,
   sourceType,
   sqlQueries,
   manualReferences,
@@ -48,6 +49,7 @@ export default function MessageBubble({
 }: {
   role: "user" | "assistant";
   content: string;
+  thinking?: string;
   sourceType?: SourceType;
   sqlQueries?: SqlQueryRecord[];
   manualReferences?: ManualReference[];
@@ -86,6 +88,19 @@ export default function MessageBubble({
             </button>
           ) : null}
         </div>
+
+        {thinking ? (
+          <details className="mb-3 rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50/70 to-indigo-50/40 px-3.5 py-2.5 text-xs shadow-xs">
+            <summary className="cursor-pointer font-semibold text-purple-900 select-none flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
+              <span>🧠 Agent Reasoning &amp; Context Resolution</span>
+              <span className="text-[10px] text-purple-600 font-normal ml-auto">(Click to view chain of thought)</span>
+            </summary>
+            <div className="mt-2.5 border-t border-purple-200/60 pt-2 text-slate-800 font-sans text-xs leading-relaxed">
+              <Markdown remarkPlugins={[remarkGfm]}>{thinking}</Markdown>
+            </div>
+          </details>
+        ) : null}
 
         <div className={`prose prose-slate prose-sm max-w-none ${failed ? "text-rose-800" : ""}`}>
           <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>

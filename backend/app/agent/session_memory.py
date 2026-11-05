@@ -107,3 +107,4 @@ def update_session(
 def clear_session(session_id: str) -> bool:
     with _lock:
         return _sessions.pop(session_id, None) is not None
+

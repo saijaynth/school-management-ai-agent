@@ -121,6 +121,31 @@ def _local_ml_agent_turn(session_id: str, message: str) -> Dict[str, Any]:
     payload = build_response(intent, message, entities, sql_results, meta)
     payload["session_id"] = session_id
 
+    # Generate Chain-of-Thought reasoning for transparency & autonomous thinking
+    from .thought_engine import AgentThoughtEngine
+    sql_plans = [r.get("sql", "") for r in sql_results if isinstance(r, dict) and r.get("sql")]
+    manual_sections = [m.get("section", "") for m in payload.get("manual_references", [])]
+    thought_trace = AgentThoughtEngine.generate_thought_trace(
+        query=message,
+        intent=intent,
+        confidence=confidence,
+        slots={
+            "student_name": student_name,
+            "faculty_name": faculty_name,
+            "section_name": section_full,
+            "class_name": class_name,
+            "subject_name": subject,
+            "date": entities.dates[0] if entities.dates else None,
+            "weekday": entities.weekdays[0] if entities.weekdays else None,
+            "low_threshold": entities.thresholds[0] if entities.thresholds else None,
+        },
+        source_type=payload.get("source_type", "database"),
+        sql_plans=sql_plans,
+        manual_sections=manual_sections,
+        session_id=session_id,
+    )
+    payload["thinking"] = thought_trace
+
     # Record message history in session
     update_session(
         session_id,

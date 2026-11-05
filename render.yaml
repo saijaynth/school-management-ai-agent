@@ -14,3 +14,4 @@ services:
         value: local
       - key: DATABASE_URL
         sync: false
+

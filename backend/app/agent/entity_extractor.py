@@ -250,3 +250,4 @@ def extract_entities(text: str, session: Optional[SessionState] = None) -> Extra
         is_pronoun_reference=is_pronoun,
         refers_to_multi_submission=refers_multi,
     )
+
