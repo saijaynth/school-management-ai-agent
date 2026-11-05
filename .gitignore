@@ -26,3 +26,11 @@ verify_log.txt
 npm_install_log.txt
 .freebuff/
 
+# Large Model Weights (hosted remotely on Hugging Face Model Hub)
+*.safetensors
+*.bin
+*.pt
+backend/data/fine_tuned_t5/*.safetensors
+backend/data/fine_tuned_t5/*.bin
+backend/data/fine_tuned_t5/spiece.model
+

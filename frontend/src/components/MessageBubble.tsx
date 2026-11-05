@@ -1,23 +1,22 @@
 import { useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ManualReference, SqlQueryRecord, SourceType } from "../types";
-import SqlResultTable from "./SqlResultTable";
+import type { ManualReference, SourceType } from "../types";
 
 function SourceBadge({ source }: { source?: SourceType }) {
   if (!source) return null;
-  const map: Record<string, { cls: string; label: string }> = {
-    database: { cls: "bg-emerald-100 text-emerald-700 border-emerald-200", label: "Live Database Query" },
-    manual: { cls: "bg-amber-100 text-amber-700 border-amber-200", label: "User Manual" },
-    hybrid: { cls: "bg-indigo-100 text-indigo-700 border-indigo-200", label: "Database + User Manual" },
-    clarification: { cls: "bg-slate-100 text-slate-600 border-slate-200", label: "Clarification" },
-    error: { cls: "bg-rose-100 text-rose-700 border-rose-200", label: "Error" },
+  const map: Record<string, { cls: string; label: string; icon: string }> = {
+    database: { cls: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Campus Records", icon: "🎓" },
+    manual: { cls: "bg-blue-50 text-blue-700 border-blue-200", label: "School Guidelines", icon: "📘" },
+    hybrid: { cls: "bg-purple-50 text-purple-700 border-purple-200", label: "Campus Records & Guidelines", icon: "✨" },
+    clarification: { cls: "bg-slate-50 text-slate-600 border-slate-200", label: "Assistant", icon: "💬" },
+    error: { cls: "bg-rose-50 text-rose-700 border-rose-200", label: "Notice", icon: "⚠️" },
   };
-  const cfg = map[source];
-  if (!cfg) return null;
+  const cfg = map[source] || map.clarification;
   return (
-    <span className={`inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${cfg.cls}`}>
-      {cfg.label}
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium shadow-2xs ${cfg.cls}`}>
+      <span>{cfg.icon}</span>
+      <span>{cfg.label}</span>
     </span>
   );
 }
@@ -25,12 +24,13 @@ function SourceBadge({ source }: { source?: SourceType }) {
 function ManualRefs({ refs }: { refs: ManualReference[] }) {
   if (!refs?.length) return null;
   return (
-    <div className="mt-2 space-y-2">
+    <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2.5">
+      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Referenced Guidelines:</p>
       {refs.map((r) => (
-        <details key={r.section} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-          <summary className="cursor-pointer font-medium text-amber-800">📖 {r.section}</summary>
-          <p className="mt-1 whitespace-pre-wrap text-xs text-amber-900/80">{r.summary}</p>
-        </details>
+        <div key={r.section} className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 text-xs text-blue-900">
+          <p className="font-semibold text-blue-950">📖 {r.section}</p>
+          <p className="mt-0.5 text-[11px] text-blue-800/90 leading-relaxed">{r.summary}</p>
+        </div>
       ))}
     </div>
   );
@@ -41,32 +41,27 @@ export default function MessageBubble({
   content,
   thinking,
   sourceType,
-  sqlQueries,
   manualReferences,
   followups,
   onFollowup,
   failed,
-  globalShowSql = false,
 }: {
   role: "user" | "assistant";
   content: string;
   thinking?: string;
   sourceType?: SourceType;
-  sqlQueries?: SqlQueryRecord[];
   manualReferences?: ManualReference[];
   followups?: string[];
   onFollowup?: (q: string) => void;
   failed?: boolean;
-  globalShowSql?: boolean;
 }) {
-  const [userToggled, setUserToggled] = useState<boolean | null>(null);
-  const showData = userToggled !== null ? userToggled : globalShowSql;
+  const [showThinking, setShowThinking] = useState(false);
   const isUser = role === "user";
 
   if (isUser) {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-indigo-600 px-4 py-2.5 text-sm leading-relaxed text-white shadow-sm">
+      <div className="flex justify-end my-1">
+        <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-2.5 text-sm leading-relaxed text-white shadow-xs">
           {content}
         </div>
       </div>
@@ -74,58 +69,85 @@ export default function MessageBubble({
   }
 
   return (
-    <div className="flex justify-start">
-      <div
-        className={`max-w-[92%] rounded-2xl rounded-bl-sm border px-4 py-3 shadow-sm ${
-          failed ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-white"
-        }`}
-      >
-        <div className="mb-1.5 flex flex-wrap items-center gap-2">
-          <SourceBadge source={sourceType} />
-          {sourceType && (sourceType === "database" || sourceType === "hybrid") && sqlQueries?.length ? (
-            <button
-              onClick={() => setUserToggled(!showData)}
-              className="rounded-full border border-slate-200 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition"
-            >
-              {showData ? "Hide" : "Show"} SQL &amp; Data ({sqlQueries.length})
-            </button>
-          ) : null}
+    <div className="flex justify-start my-2">
+      <div className="flex gap-2.5 max-w-[94%] items-start">
+        {/* Assistant Avatar */}
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 text-sm font-bold shadow-2xs border border-indigo-200/50">
+          🎓
         </div>
 
-        {thinking ? (
-          <details className="mb-3 rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50/70 to-indigo-50/40 px-3.5 py-2.5 text-xs shadow-xs">
-            <summary className="cursor-pointer font-semibold text-purple-900 select-none flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
-              <span>🧠 Agent Reasoning &amp; Context Resolution</span>
-              <span className="text-[10px] text-purple-600 font-normal ml-auto">(Click to view chain of thought)</span>
-            </summary>
-            <div className="mt-2.5 border-t border-purple-200/60 pt-2 text-slate-800 font-sans text-xs leading-relaxed">
+        <div
+          className={`flex-1 rounded-2xl rounded-tl-sm border px-5 py-4 shadow-xs transition ${
+            failed ? "border-rose-200 bg-rose-50/70" : "border-slate-200/90 bg-white"
+          }`}
+        >
+          {/* Header Badge */}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <SourceBadge source={sourceType} />
+            {thinking ? (
+              <button
+                onClick={() => setShowThinking(!showThinking)}
+                className="text-[11px] text-slate-400 hover:text-indigo-600 transition flex items-center gap-1 cursor-pointer font-medium"
+              >
+                <span>{showThinking ? "Hide reasoning" : "View reasoning"}</span>
+                <span>{showThinking ? "▲" : "▼"}</span>
+              </button>
+            ) : null}
+          </div>
+
+          {/* Reasoning trace (collapsible, subtle) */}
+          {thinking && showThinking ? (
+            <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 text-xs text-indigo-900 leading-relaxed font-mono">
               <Markdown remarkPlugins={[remarkGfm]}>{thinking}</Markdown>
             </div>
-          </details>
-        ) : null}
+          ) : null}
 
-        <div className={`prose prose-slate prose-sm max-w-none ${failed ? "text-rose-800" : ""}`}>
-          <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
-        </div>
-
-        {showData &&
-          sqlQueries?.map((q, i) => <SqlResultTable key={i} query={q} />)}
-        <ManualRefs refs={manualReferences ?? []} />
-
-        {followups?.length ? (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {followups.map((f) => (
-              <button
-                key={f}
-                onClick={() => onFollowup?.(f)}
-                className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100"
-              >
-                {f}
-              </button>
-            ))}
+          {/* Main Answer Content */}
+          <div className="prose prose-slate max-w-none text-sm leading-relaxed text-slate-800 break-words">
+            <Markdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                table: ({ ...props }) => (
+                  <div className="my-3 overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
+                    <table className="min-w-full divide-y divide-slate-200 text-left text-xs" {...props} />
+                  </div>
+                ),
+                thead: ({ ...props }) => <thead className="bg-slate-50 font-semibold text-slate-700" {...props} />,
+                th: ({ ...props }) => <th className="px-3.5 py-2.5 border-b border-slate-200" {...props} />,
+                td: ({ ...props }) => <td className="px-3.5 py-2 border-b border-slate-100 text-slate-600" {...props} />,
+                tr: ({ ...props }) => <tr className="hover:bg-slate-50/70 transition" {...props} />,
+                ul: ({ ...props }) => <ul className="my-2 list-disc list-inside space-y-1 text-slate-700" {...props} />,
+                ol: ({ ...props }) => <ol className="my-2 list-decimal list-inside space-y-1 text-slate-700" {...props} />,
+                p: ({ ...props }) => <p className="my-1.5" {...props} />,
+                strong: ({ ...props }) => <strong className="font-semibold text-slate-900" {...props} />,
+              }}
+            >
+              {content}
+            </Markdown>
           </div>
-        ) : null}
+
+          {/* Manual references if available */}
+          {manualReferences && <ManualRefs refs={manualReferences} />}
+
+          {/* Suggested Interactive Follow-up Chips */}
+          {followups && followups.length > 0 && onFollowup ? (
+            <div className="mt-3.5 pt-2.5 border-t border-slate-100">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Suggested Next Questions:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {followups.map((sugg) => (
+                  <button
+                    key={sugg}
+                    onClick={() => onFollowup(sugg)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer active:scale-95 shadow-2xs"
+                  >
+                    <span>💬</span>
+                    <span>{sugg}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

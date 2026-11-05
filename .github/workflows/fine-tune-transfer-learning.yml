@@ -1,0 +1,78 @@
+name: Fine-Tune Transfer Learning Agent (Hugging Face)
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_model:
+        description: 'Pre-trained Hugging Face base model to transfer and fine-tune'
+        required: true
+        default: 'google/flan-t5-small'
+      epochs:
+        description: 'Number of training epochs'
+        required: false
+        default: '3'
+      batch_size:
+        description: 'Batch size for fine-tuning'
+        required: false
+        default: '8'
+      max_samples:
+        description: 'Max dataset samples (0 for all 8,000 samples)'
+        required: false
+        default: '0'
+  push:
+    paths:
+      - 'backend/ml/fine_tune_t5.py'
+      - 'backend/ml/data/**'
+    branches: [ main, master ]
+
+jobs:
+  fine-tune-and-publish:
+    name: Fine-Tune Pre-trained Transformer & Publish to Model Hub
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://neondb_owner:npg_Ssqzmd9cDo0l@ep-fancy-cell-bd9rqecw-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require' }}
+      DB_SCHEMA: school
+      LLM_PROVIDER: local
+      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install torch transformers accelerate huggingface_hub
+
+      - name: Execute Transfer Learning Fine-Tuning
+        run: |
+          python backend/ml/fine_tune_t5.py \
+            --model-name "${{ github.event.inputs.base_model || 'google/flan-t5-small' }}" \
+            --epochs "${{ github.event.inputs.epochs || '3' }}" \
+            --batch-size "${{ github.event.inputs.batch_size || '8' }}" \
+            --max-samples "${{ github.event.inputs.max_samples || '0' }}" \
+            --hf-token "${{ secrets.HF_ACCESS_TOKEN }}" \
+            --repo-id "jaay2/school-management-t5-agent"
+
+      - name: Upload Fine-Tuned Model Weights Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fine-tuned-t5-agent-artifacts
+          path: backend/data/fine_tuned_t5/
+
+      - name: Verify Full Agent Ground-Truth Suite
+        run: |
+          python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 &
+          sleep 4
+          python backend/scripts/verify_agent.py

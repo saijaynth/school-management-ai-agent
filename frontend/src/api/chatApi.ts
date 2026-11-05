@@ -6,12 +6,7 @@ function getBaseCandidates(): string[] {
     return [import.meta.env.VITE_API_BASE];
   }
   if (typeof window !== "undefined") {
-    // If the frontend is served directly by the backend on port 8000
-    if (window.location.port === "8000" || !window.location.port) {
-      return ["", "http://127.0.0.1:8000"];
-    }
-    // If running in development (e.g. port 5173, 5174, 3000)
-    return ["http://127.0.0.1:8000", "http://localhost:8000", ""];
+    return ["", "http://127.0.0.1:8000", "http://localhost:8000"];
   }
   return ["http://127.0.0.1:8000"];
 }

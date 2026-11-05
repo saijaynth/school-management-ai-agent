@@ -57,32 +57,41 @@ export interface ChatMessage {
   failed?: boolean;
 }
 
-export const STARTER_PROMPTS: { group: "Admin" | "Faculty" | "Student"; items: string[] }[] = [
+export const STARTER_PROMPTS: { group: string; items: string[] }[] = [
   {
-    group: "Admin",
+    group: "Attendance & Leaves",
     items: [
-      "Show pending leave requests",
       "Student attendance report - who is below 75%?",
-      "Grade 10 Mid Term rank list with totals and grades",
-      "According to the manual, how do I approve a leave request?",
-    ],
-  },
-  {
-    group: "Faculty",
-    items: [
-      "Anita Sharma's timetable and assigned courses",
+      "Which leave requests are pending approval?",
       "Faculty attendance on November 2, 2026",
-      "Pending homework & assignment submissions",
-      "How do I enter exam marks according to the manual?",
+      "Show all student attendance percentages",
     ],
   },
   {
-    group: "Student",
+    group: "Classes & Timetable",
     items: [
-      "Kiran Patel's Mid Term marks and progress report",
-      "Arjun Rao's timetable and homework",
-      "Show my unread notifications for stu_arjun",
+      "What is Grade 10-A's Monday timetable?",
+      "Who teaches Science?",
+      "What is Sara Thomas's room and schedule on Monday?",
+      "How many students are in Grade 9-A?",
+    ],
+  },
+  {
+    group: "Exams & Marks",
+    items: [
+      "Compare Kiran Patel and Divya Nair's marks",
+      "Which subject has Kiran scored the lowest?",
+      "Grade 10 Mid Term rank list with totals and grades",
+      "Pending homework and assignment submissions",
+    ],
+  },
+  {
+    group: "Campus Guidelines",
+    items: [
+      "According to the manual, how do I approve a leave request?",
       "How can a student apply for leave?",
+      "Why shouldn't records be deleted from the system?",
+      "What is the year-end student promotion procedure?",
     ],
   },
 ];
