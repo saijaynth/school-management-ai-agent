@@ -1,0 +1,14 @@
+node_modules
+frontend/node_modules
+.venv
+venv
+.git
+.freebuff
+_pgportable
+backend/data/fine_tuned_t5/*.safetensors
+backend/data/fine_tuned_t5/*.bin
+backend/data/fine_tuned_t5/*.pt
+*.log
+*.txt
+*.pdf
+school_management_postgres92.sql
