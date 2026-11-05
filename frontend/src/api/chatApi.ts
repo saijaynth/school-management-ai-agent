@@ -1,6 +1,10 @@
 import type { ChatResponse, HealthResponse, SchemaSummaryResponse } from "../types";
 
-const BASE = import.meta.env.VITE_API_BASE ?? "";
+const BASE =
+  import.meta.env.VITE_API_BASE ||
+  (typeof window !== "undefined" && window.location.port === "5173"
+    ? "http://127.0.0.1:8000"
+    : "");
 
 async function request<T>(path: string, init?: RequestInit, timeoutMs = 300_000): Promise<T> {
   const ctrl = new AbortController();

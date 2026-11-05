@@ -92,3 +92,4 @@ class AgentThoughtEngine:
             lines.append("- Response Mode: Direct clarification or refusal notice.")
 
         return "\n".join(lines)
+

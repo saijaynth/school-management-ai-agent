@@ -15,15 +15,23 @@ export default function App() {
   const [summary, setSummary] = useState<SchemaSummaryResponse | null>(null);
 
   useEffect(() => {
-    api
-      .health()
-      .then(setHealth)
-      .catch(() => setHealth(null));
-    api
-      .schemaSummary()
-      .then(setSummary)
-      .catch(() => setSummary(null));
-  }, []);
+    let timer: ReturnType<typeof setInterval>;
+    const checkStatus = () => {
+      api
+        .health()
+        .then((h) => {
+          setHealth(h);
+          if (!summary && h?.status === "ok") {
+            api.schemaSummary().then(setSummary).catch(() => {});
+          }
+        })
+        .catch(() => setHealth(null));
+    };
+
+    checkStatus();
+    timer = setInterval(checkStatus, 3000);
+    return () => clearInterval(timer);
+  }, [summary]);
 
   const send = useCallback(
     async (text: string) => {
