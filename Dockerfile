@@ -36,7 +36,7 @@ RUN pip install --no-cache-dir -r ./backend/requirements.txt
 # Copy backend code, SQL seed, and manuals
 COPY backend/ ./backend/
 COPY school_management_postgres92.sql ./
-COPY "School Management Database - User Manual.pdf" ./
+COPY ["School Management Database - User Manual.pdf", "./"]
 COPY manual_extracted.txt ./
 
 # Copy compiled frontend from Stage 1
