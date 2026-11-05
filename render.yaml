@@ -3,15 +3,18 @@ services:
     name: school-management-ai
     env: docker
     plan: free
+    region: oregon
     dockerfilePath: ./Dockerfile
-    healthCheckPath: /api/health
+    healthCheckPath: /health
     envVars:
       - key: PORT
-        value: 7860
+        value: 10000
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_Ssqzmd9cDo0l@ep-fancy-cell-bd9rqecw-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require
       - key: DB_SCHEMA
         value: school
       - key: LLM_PROVIDER
         value: local
-      - key: DATABASE_URL
+      - key: HF_ACCESS_TOKEN
         sync: false
 

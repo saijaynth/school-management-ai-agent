@@ -9,11 +9,15 @@ export default function Sidebar({
   summary: _summary,
   onPick,
   onReset,
+  isOpen = false,
+  onClose,
 }: {
   health: HealthResponse | null;
   summary?: SchemaSummaryResponse | null;
   onPick: (q: string) => void;
   onReset: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("prompts");
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
@@ -26,18 +30,45 @@ export default function Sidebar({
   const toggleGroup = (g: string) => setOpenGroups((s) => ({ ...s, [g]: !s[g] }));
 
   return (
-    <aside className="flex h-full w-80 min-w-80 flex-col border-r border-slate-200 bg-white shadow-xs">
-      {/* Friendly Campus Branding */}
-      <div className="border-b border-slate-100 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-xl text-white shadow-sm">
-            🎓
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs transition-opacity lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex h-full w-80 max-w-[85vw] flex-col border-r border-slate-200 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:static lg:w-80 lg:min-w-80 lg:shadow-xs lg:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Friendly Campus Branding */}
+        <div className="border-b border-slate-100 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-xl text-white shadow-sm">
+                🎓
+              </div>
+              <div>
+                <h1 className="text-sm font-bold text-slate-900 tracking-tight">School AI Assistant</h1>
+                <p className="text-xs text-slate-500">Your interactive campus guide</p>
+              </div>
+            </div>
+
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:hidden cursor-pointer"
+                title="Close drawer"
+                aria-label="Close drawer"
+              >
+                ✕
+              </button>
+            )}
           </div>
-          <div>
-            <h1 className="text-sm font-bold text-slate-900 tracking-tight">School AI Assistant</h1>
-            <p className="text-xs text-slate-500">Your interactive campus guide</p>
-          </div>
-        </div>
 
         {/* Status Pill */}
         <div
@@ -175,6 +206,7 @@ export default function Sidebar({
           <span>New Conversation / Reset</span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -39,6 +39,7 @@ export default function ChatWindow({
   onSend,
   onRetry,
   health,
+  onToggleSidebar,
 }: {
   sessionId: string;
   messages: ChatMessage[];
@@ -48,6 +49,7 @@ export default function ChatWindow({
   onRetry: () => void;
   health: HealthResponse | null;
   summary: import("../types").SchemaSummaryResponse | null;
+  onToggleSidebar?: () => void;
 }) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -66,24 +68,36 @@ export default function ChatWindow({
   return (
     <main className="flex h-screen min-w-0 flex-1 flex-col bg-slate-50/70">
       {/* Top Header */}
-      <header className="flex items-center justify-between border-b border-slate-200/80 bg-white px-6 py-3 shadow-2xs">
-        <div>
-          <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <span>School AI Assistant</span>
-          </h2>
-          <p className="text-xs text-slate-500 hidden sm:block">Ask anything about students, faculty, timetables, attendance, or school guidelines</p>
+      <header className="flex items-center justify-between border-b border-slate-200/80 bg-white px-3 sm:px-6 py-2.5 sm:py-3 shadow-2xs">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {onToggleSidebar && (
+            <button
+              onClick={onToggleSidebar}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 shadow-2xs hover:bg-slate-100 lg:hidden cursor-pointer active:scale-95 transition"
+              title="Open Campus Guide"
+              aria-label="Open Campus Guide"
+            >
+              <span className="text-base font-bold">☰</span>
+            </button>
+          )}
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
+              <span>School AI Assistant</span>
+            </h2>
+            <p className="text-[11px] text-slate-500 hidden sm:block">Ask anything about students, faculty, timetables, attendance, or school guidelines</p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] sm:text-xs font-medium border ${
               health?.status === "ok"
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                 : "bg-amber-50 text-amber-700 border-amber-200"
             }`}
           >
-            <span className={`h-2 w-2 rounded-full ${health?.status === "ok" ? "bg-emerald-500" : "bg-amber-500"}`} />
-            <span>{health?.status === "ok" ? "Assistant Online" : "Checking Status..."}</span>
+            <span className={`h-2 w-2 rounded-full ${health?.status === "ok" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+            <span>{health?.status === "ok" ? "Assistant Online" : "Connecting..."}</span>
           </span>
         </div>
       </header>

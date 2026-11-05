@@ -74,7 +74,7 @@ app.add_middleware(
 )
 
 
-@app.get("/api/health", response_model=HealthResponse)
+@app.api_route("/api/health", methods=["GET", "HEAD", "POST"], response_model=HealthResponse)
 def health() -> HealthResponse:
     db = check_connectivity()
     cfg = resolve_llm()
@@ -95,6 +95,13 @@ def health() -> HealthResponse:
         llm=llm,
         counts=counts,
     )
+
+
+@app.api_route("/health", methods=["GET", "HEAD", "POST"])
+@app.api_route("/ping", methods=["GET", "HEAD", "POST"])
+def uptime_ping() -> Dict[str, Any]:
+    """Lightweight 200 OK probe for UptimeRobot, cron jobs, and keep-alive monitors."""
+    return {"status": "ok", "service": "school-management-ai", "uptime": "active"}
 
 
 @app.get("/api/schema-summary", response_model=SchemaSummaryResponse)
@@ -190,7 +197,7 @@ if frontend_dist.is_dir():
     if (frontend_dist / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
 
-    @app.get("/{full_path:path}")
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
     async def serve_spa(full_path: str):
         target = frontend_dist / full_path
         if full_path and target.is_file():

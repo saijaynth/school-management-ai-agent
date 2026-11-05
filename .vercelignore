@@ -12,3 +12,4 @@ backend/data/fine_tuned_t5/*.pt
 *.txt
 *.pdf
 school_management_postgres92.sql
+

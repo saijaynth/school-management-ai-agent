@@ -103,9 +103,26 @@ export default function App() {
     }
   }, [messages, send]);
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handlePickPrompt = useCallback(
+    (text: string) => {
+      setSidebarOpen(false);
+      void send(text);
+    },
+    [send],
+  );
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 antialiased">
-      <Sidebar health={health} summary={summary} onPick={send} onReset={reset} />
+    <div className="relative flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 antialiased">
+      <Sidebar
+        health={health}
+        summary={summary}
+        onPick={handlePickPrompt}
+        onReset={reset}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
       <ChatWindow
         sessionId={sessionId}
         messages={messages}
@@ -115,6 +132,7 @@ export default function App() {
         onRetry={retry}
         health={health}
         summary={summary}
+        onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
       />
     </div>
   );
