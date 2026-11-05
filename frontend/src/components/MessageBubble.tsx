@@ -2,20 +2,23 @@ import { useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ManualReference, SourceType } from "../types";
+import { BookOpenIcon, DatabaseIcon, GraduationCapIcon } from "./Icons";
 
 function SourceBadge({ source }: { source?: SourceType }) {
   if (!source) return null;
-  const map: Record<string, { cls: string; label: string; icon: string }> = {
-    database: { cls: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Campus Records", icon: "🎓" },
-    manual: { cls: "bg-blue-50 text-blue-700 border-blue-200", label: "School Guidelines", icon: "📘" },
-    hybrid: { cls: "bg-purple-50 text-purple-700 border-purple-200", label: "Campus Records & Guidelines", icon: "✨" },
-    clarification: { cls: "bg-slate-50 text-slate-600 border-slate-200", label: "Assistant", icon: "💬" },
-    error: { cls: "bg-rose-50 text-rose-700 border-rose-200", label: "Notice", icon: "⚠️" },
+  const map: Record<string, { label: string; icon: typeof DatabaseIcon }> = {
+    database: { label: "Campus database", icon: DatabaseIcon },
+    manual: { label: "School manual", icon: BookOpenIcon },
+    hybrid: { label: "Database & manual", icon: DatabaseIcon },
+    clarification: { label: "Assistant", icon: GraduationCapIcon },
+    error: { label: "Notice", icon: GraduationCapIcon },
   };
   const cfg = map[source] || map.clarification;
+  const IconComponent = cfg.icon;
+
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium shadow-2xs ${cfg.cls}`}>
-      <span>{cfg.icon}</span>
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+      <IconComponent className="h-3 w-3 text-slate-500 shrink-0" />
       <span>{cfg.label}</span>
     </span>
   );
@@ -25,11 +28,11 @@ function ManualRefs({ refs }: { refs: ManualReference[] }) {
   if (!refs?.length) return null;
   return (
     <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2.5">
-      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Referenced Guidelines:</p>
+      <p className="text-[11px] font-medium text-slate-400">Referenced guidelines</p>
       {refs.map((r) => (
-        <div key={r.section} className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 text-xs text-blue-900">
-          <p className="font-semibold text-blue-950">📖 {r.section}</p>
-          <p className="mt-0.5 text-[11px] text-blue-800/90 leading-relaxed">{r.summary}</p>
+        <div key={r.section} className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5 text-xs text-slate-800">
+          <p className="font-semibold text-slate-900">{r.section}</p>
+          <p className="mt-0.5 text-[11px] text-slate-600 leading-relaxed">{r.summary}</p>
         </div>
       ))}
     </div>
@@ -60,8 +63,8 @@ export default function MessageBubble({
 
   if (isUser) {
     return (
-      <div className="flex justify-end my-1">
-        <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-2.5 text-sm leading-relaxed text-white shadow-xs">
+      <div className="flex justify-end my-1.5">
+        <div className="max-w-[88%] sm:max-w-[76%] rounded-2xl rounded-tr-sm bg-slate-900 px-4 py-2.5 text-sm leading-relaxed text-slate-50 shadow-2xs">
           {content}
         </div>
       </div>
@@ -70,77 +73,90 @@ export default function MessageBubble({
 
   return (
     <div className="flex justify-start my-2">
-      <div className="flex gap-2.5 max-w-[94%] items-start">
-        {/* Assistant Avatar */}
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 text-sm font-bold shadow-2xs border border-indigo-200/50">
-          🎓
+      <div className="flex w-full sm:max-w-[92%] lg:max-w-[88%] gap-3 items-start">
+        {/* Desktop-only side avatar (reclaims 44px on mobile) */}
+        <div className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-700">
+          <GraduationCapIcon className="h-4 w-4" />
         </div>
 
+        {/* Bubble card */}
         <div
-          className={`flex-1 rounded-2xl rounded-tl-sm border px-5 py-4 shadow-xs transition ${
-            failed ? "border-rose-200 bg-rose-50/70" : "border-slate-200/90 bg-white"
+          className={`w-full min-w-0 rounded-xl border p-3.5 sm:p-5 shadow-2xs transition-colors ${
+            failed ? "border-rose-200 bg-rose-50/50" : "border-slate-200/90 bg-white"
           }`}
         >
-          {/* Header Badge */}
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <SourceBadge source={sourceType} />
+          {/* Header row */}
+          <div className="mb-2.5 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <span className="sm:hidden flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-slate-700">
+                <GraduationCapIcon className="h-3 w-3" />
+              </span>
+              <SourceBadge source={sourceType} />
+            </div>
+
             {thinking ? (
               <button
                 onClick={() => setShowThinking(!showThinking)}
-                className="text-[11px] text-slate-400 hover:text-indigo-600 transition flex items-center gap-1 cursor-pointer font-medium"
+                className="text-[11px] font-medium text-slate-400 hover:text-slate-700 transition cursor-pointer"
               >
-                <span>{showThinking ? "Hide reasoning" : "View reasoning"}</span>
-                <span>{showThinking ? "▲" : "▼"}</span>
+                {showThinking ? "Hide reasoning" : "View reasoning"}
               </button>
             ) : null}
           </div>
 
-          {/* Reasoning trace (collapsible, subtle) */}
+          {/* Reasoning trace (collapsible) */}
           {thinking && showThinking ? (
-            <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 text-xs text-indigo-900 leading-relaxed font-mono">
+            <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700 font-mono leading-relaxed overflow-x-auto">
               <Markdown remarkPlugins={[remarkGfm]}>{thinking}</Markdown>
             </div>
           ) : null}
 
-          {/* Main Answer Content */}
+          {/* Markdown Content */}
           <div className="prose prose-slate max-w-none text-sm leading-relaxed text-slate-800 break-words">
             <Markdown
               remarkPlugins={[remarkGfm]}
               components={{
                 table: ({ ...props }) => (
-                  <div className="my-3 overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
-                    <table className="min-w-full divide-y divide-slate-200 text-left text-xs" {...props} />
+                  <div className="my-3 -mx-1 sm:mx-0 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                    <table className="min-w-full divide-y divide-slate-200 text-left text-xs tabular-nums" {...props} />
                   </div>
                 ),
-                thead: ({ ...props }) => <thead className="bg-slate-50 font-semibold text-slate-700" {...props} />,
-                th: ({ ...props }) => <th className="px-3.5 py-2.5 border-b border-slate-200" {...props} />,
-                td: ({ ...props }) => <td className="px-3.5 py-2 border-b border-slate-100 text-slate-600" {...props} />,
-                tr: ({ ...props }) => <tr className="hover:bg-slate-50/70 transition" {...props} />,
+                thead: ({ ...props }) => (
+                  <thead className="bg-slate-50/90 text-[11px] font-semibold text-slate-600 uppercase tracking-wide" {...props} />
+                ),
+                th: ({ ...props }) => (
+                  <th className="px-3 py-2 border-b border-slate-200 whitespace-nowrap" {...props} />
+                ),
+                td: ({ ...props }) => (
+                  <td className="px-3 py-2 border-b border-slate-100 text-slate-700 whitespace-nowrap font-normal" {...props} />
+                ),
+                tr: ({ ...props }) => <tr className="hover:bg-slate-50/60 transition-colors" {...props} />,
                 ul: ({ ...props }) => <ul className="my-2 list-disc list-inside space-y-1 text-slate-700" {...props} />,
                 ol: ({ ...props }) => <ol className="my-2 list-decimal list-inside space-y-1 text-slate-700" {...props} />,
                 p: ({ ...props }) => <p className="my-1.5" {...props} />,
                 strong: ({ ...props }) => <strong className="font-semibold text-slate-900" {...props} />,
+                h3: ({ ...props }) => <h3 className="text-sm font-semibold text-slate-900 mt-2 mb-1" {...props} />,
+                h4: ({ ...props }) => <h4 className="text-xs font-semibold text-slate-800 mt-2 mb-1" {...props} />,
               }}
             >
               {content}
             </Markdown>
           </div>
 
-          {/* Manual references if available */}
+          {/* Manual references */}
           {manualReferences && <ManualRefs refs={manualReferences} />}
 
-          {/* Suggested Interactive Follow-up Chips */}
+          {/* Follow-up Question Chips */}
           {followups && followups.length > 0 && onFollowup ? (
             <div className="mt-3.5 pt-2.5 border-t border-slate-100">
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Suggested Next Questions:</p>
+              <p className="text-[11px] font-medium text-slate-400 mb-1.5">Suggested follow-ups</p>
               <div className="flex flex-wrap gap-1.5">
                 {followups.map((sugg) => (
                   <button
                     key={sugg}
                     onClick={() => onFollowup(sugg)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer active:scale-95 shadow-2xs"
+                    className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 cursor-pointer active:scale-95"
                   >
-                    <span>💬</span>
                     <span>{sugg}</span>
                   </button>
                 ))}
