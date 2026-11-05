@@ -131,7 +131,7 @@ def _local_ml_agent_turn(session_id: str, message: str) -> Dict[str, Any]:
         facts = query_full_data_knowledge(message, top_k=1)
         if facts and facts[0][1] >= 0.22:
             fact, score = facts[0]
-            payload["answer"] = f"**Answered from Full Database Ground Truth ({fact.title}):**\n\n{fact.text}"
+            payload["answer"] = f"### {fact.title}\n\n{fact.text}"
             payload["source_type"] = "database"
 
     # Generate Chain-of-Thought reasoning for transparency & autonomous thinking

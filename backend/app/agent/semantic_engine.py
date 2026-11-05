@@ -114,3 +114,4 @@ def get_semantic_engine() -> UniversalSemanticEngine:
 
 def query_full_data_knowledge(query: str, top_k: int = 3) -> List[Tuple[KnowledgeFact, float]]:
     return get_semantic_engine().search(query, top_k=top_k)
+

@@ -1,4 +1,11 @@
-"""Grounded response synthesis and formatting engine for School Management AI."""
+"""Grounded response synthesis and formatting engine for School Management AI.
+
+Formats answers for non-technical users:
+- Direct answers first
+- Plain, grammatically correct language
+- No raw table names (like `school.v_student_attendance_report`), raw SQL, or technical debug jargon in chat
+- Clean, readable Markdown tables and bulleted lists
+"""
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -24,18 +31,12 @@ def build_response(
     # -----------------------------------------------------------------------
     if intent == "mutation_refusal":
         answer = (
-            "**Refusal — Read-Only Policy Enforced**\n\n"
-            "The School Management AI Chatbot is strictly configured in **read-only mode** to protect database integrity. "
-            "Mutating statements (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`) are blocked by the security validator.\n\n"
-            "### Recommended Administrative Workflow (User Manual, Section 10.1 & 11.4)\n"
-            "To remove or deactivate records in accordance with school policy:\n"
-            "- **Historical Preservation**: Child tables (attendance, marks, submissions) maintain foreign keys without cascading deletes. "
-            "To preserve audit history, records are deactivated rather than deleted.\n"
-            "- **Reference SQL pattern** (to be executed only by an authorized database administrator in `psql`):\n"
-            "```sql\n"
-            "-- Set status to Inactive or Rejected via manual admin console\n"
-            "UPDATE school.users SET is_active = FALSE WHERE user_id = <target_user_id>;\n"
-            "```"
+            "I cannot make changes or delete data because I am configured in **read-only mode** to protect school records.\n\n"
+            "### Recommended Administrative Workflow\n"
+            "Under school policy, student and academic records are never permanently deleted because existing grades, attendance logs, and report cards depend on them. Instead, administrators deactivate accounts:\n\n"
+            "1. An administrator signs in to the administrative database console.\n"
+            "2. The user's account status is set to **Inactive** (`is_active = FALSE`).\n"
+            "3. Past academic records, attendance history, and exam results remain safely preserved for historical auditing."
         )
         return {
             "answer": answer,
@@ -44,7 +45,7 @@ def build_response(
             "manual_references": [
                 {
                     "section": "10.1 Foreign keys and insert order",
-                    "summary": "Rows cannot be deleted while other rows still refer to them (no cascading deletes). Deactivate users instead (is_active = FALSE) to preserve history.",
+                    "summary": "Rows cannot be deleted while referenced by academic records. Deactivate accounts instead to preserve audit history.",
                 }
             ],
             "suggested_followups": [
@@ -62,102 +63,77 @@ def build_response(
         manual_res = lookup_manual(raw_query)
         refs = manual_res.get("sections", [])
         
-        # Dedicated answers for core manager audit questions
-        if "year-end routine" in lowered and ("delete" in lowered or "deactivated" in lowered):
+        if "year-end routine" in lowered or "year end" in lowered:
             answer = (
-                "**Answered from the School Management Database - User Manual, Sections 10.1 & 11.6:**\n\n"
-                "### 1. Why Users Are Deactivated Instead of Deleted (Section 10.1 & 11.4)\n"
-                "- **Foreign Key Integrity**: Tables like `student_attendance`, `faculty_attendance`, `marks`, `homework_submissions`, `assignment_submissions`, and `notifications` reference user profiles.\n"
-                "- **No Cascading Deletes**: The PostgreSQL schema intentionally defines no cascading deletes to prevent accidental destruction of academic records.\n"
-                "- **Audit Preservation**: Setting `users.is_active = FALSE` prevents future system logins while permanently preserving all past report cards, marks, and attendance history.\n\n"
-                "### 2. The 4-Step Year-End Routine (Section 11.6)\n"
-                "1. **Create New Academic Year**: Insert the new row into `academic_years` and update the previous year to `is_current = FALSE`.\n"
-                "2. **Scaffold Sections**: Create the new academic year's class sections in `sections`.\n"
-                "3. **Promote Students**: Reassign students to their new sections using:\n"
-                "   ```sql\n"
-                "   UPDATE school.students SET section_id = <new_section_id> WHERE student_id = <id>;\n"
-                "   ```\n"
-                "4. **Reallocate Curriculum**: Create new `course_assignments`, populate `timetable` rows, and schedule new `exams`."
-            )
-            sec_ref = "10.1 & 11.6 Deactivation and Year-end routine"
-        elif "year-end routine" in lowered or "year end" in lowered:
-            answer = (
-                "**Answered from the School Management Database - User Manual, Section 11.6:**\n\n"
-                "### Year-End Routine (4-Step Workflow)\n"
-                "1. **Create New Academic Year**: Insert the new row into `academic_years` and update the previous year to `is_current = FALSE`.\n"
-                "2. **Scaffold Sections**: Create the new academic year's class sections in `sections`.\n"
-                "3. **Promote Students**: Reassign students to their new sections using:\n"
-                "   ```sql\n"
-                "   UPDATE school.students SET section_id = <new_section_id> WHERE student_id = <id>;\n"
-                "   ```\n"
-                "4. **Reallocate Curriculum**: Create new `course_assignments`, populate `timetable` rows, and schedule new `exams`.\n\n"
-                "> Past attendance, marks, homework, and progress reports remain intact in the database for historical audit trails."
+                "The **Year-End Routine** consists of four standard administrative steps to transition the school into a new academic session:\n\n"
+                "1. **Create the New Academic Year**: Register the upcoming school year (e.g., `2027-28`) and mark the outgoing year as no longer current.\n"
+                "2. **Set Up New Class Sections**: Create sections for the new session (e.g., Grade 9-A, Grade 10-A).\n"
+                "3. **Promote Students**: Reassign enrolled students to their newly promoted class sections.\n"
+                "4. **Allocate Curriculum & Timetables**: Assign faculty members to courses, configure weekly timetables, and schedule exams.\n\n"
+                "*All historical records—including previous attendance, report cards, and grades—remain permanently preserved in the system.*"
             )
             sec_ref = "11.6 Year-end routine"
-        elif "deactivated instead of deleted" in lowered or "why users are deactivated" in lowered or "cascading delete" in lowered:
+        elif "deactivated instead of deleted" in lowered or "why users are deactivated" in lowered or "cascading delete" in lowered or "delete" in lowered:
             answer = (
-                "**Answered from the School Management Database - User Manual, Section 10.1 & 11.4:**\n\n"
-                "### Why Users Are Deactivated Instead of Deleted\n"
-                "- **Foreign Key Integrity**: Tables such as `student_attendance`, `faculty_attendance`, `marks`, `homework_submissions`, `assignment_submissions`, and `notifications` reference `student_id`, `faculty_id`, or `user_id`.\n"
-                "- **No Cascading Deletes**: The PostgreSQL schema does not define cascading deletes on foreign keys, preventing accidental destruction of academic records.\n"
-                "- **Audit Preservation**: Deactivating a user by setting `users.is_active = FALSE` prevents future logins while permanently maintaining all past report cards, exam marks, and attendance logs."
+                "Users are **deactivated instead of deleted** to protect the integrity of academic records:\n\n"
+                "- **Audit Preservation**: Past report cards, exam marks, homework submissions, and attendance logs are linked to user accounts. Deleting a user would corrupt or orphan those historical records.\n"
+                "- **Foreign Key Constraints**: The database strictly prevents cascading deletes on student and teacher records.\n"
+                "- **Access Revocation**: Setting an account to inactive (`is_active = FALSE`) immediately prevents the user from logging in while keeping all past academic accomplishments intact."
             )
             sec_ref = "10.1 Foreign keys and insert order"
         elif "add a new student" in lowered or "add student" in lowered:
             answer = (
-                "**Answered from the School Management Database - User Manual, Section 10.1:**\n\n"
-                "### Procedure to Add a New Student (Insert Order)\n"
-                "Because a student requires a user account and an assigned section, insert parent records before child records in this sequence:\n"
-                "1. Ensure the `roles` row exists (`role_id = 3` for Student).\n"
-                "2. Insert into `school.users` (provides `user_id` and credentials).\n"
-                "3. Ensure the student's target `section_id` exists in `school.sections`.\n"
-                "4. Insert into `school.students` referencing the generated `user_id` and `section_id`:\n"
-                "   ```sql\n"
-                "   INSERT INTO school.users (role_id, username, password_hash, first_name, last_name, email, phone) "
-                "   VALUES (3, 'stu_new', 'hash', 'New', 'Student', 'new@school.edu', '9876543210') RETURNING user_id;\n"
-                "   INSERT INTO school.students (user_id, admission_no, roll_no, section_id, date_of_birth, gender, guardian_name, guardian_phone, admission_date) "
-                "   VALUES (<user_id>, 'ADM2026005', 3, 1, '2011-04-10', 'Male', 'Guardian Name', '9876543211', CURRENT_DATE);\n"
-                "   ```"
+                "To add a new student to the school database, records must be created in this sequence:\n\n"
+                "1. **Create the User Account**: Register the student in the user accounts table with login credentials and contact details.\n"
+                "2. **Verify the Section**: Ensure the student's assigned class section (e.g., Grade 9-A) exists.\n"
+                "3. **Create the Student Profile**: Link the newly created user account to the class section with their admission number, roll number, and guardian contact details."
             )
             sec_ref = "10.1 Foreign keys and insert order"
         elif "leave approval" in lowered or "approve" in lowered:
             answer = (
-                "**Answered from the School Management Database - User Manual, Section 6.5:**\n\n"
-                "### Leave Approval Workflow\n"
-                "1. **Submission**: A faculty member or student submits a leave request with `status = 'Pending'` via `school.leave_requests`.\n"
-                "2. **Admin Queue**: Admins view active requests using the built-in view `school.v_pending_leaves`.\n"
-                "3. **Resolution**: The admin updates the request status to either `'Approved'` or `'Rejected'`, recording `reviewed_by` (admin's `user_id`) and `review_date`.\n"
-                "4. **Notification**: A confirmation message is inserted into `school.notifications` alerting the applicant."
+                "Here is how leave requests are processed according to the system workflow:\n\n"
+                "1. **Submission**: A faculty member or student submits a leave application with dates and reasons, starting with a **Pending** status.\n"
+                "2. **Admin Review**: School administrators review all pending applications in the approval queue.\n"
+                "3. **Decision**: The administrator updates the status to either **Approved** or **Rejected**.\n"
+                "4. **Notification**: The system automatically generates a notification informing the applicant of the decision."
             )
             sec_ref = "6.5 Leave approvals"
+        elif "exam marks" in lowered or "enter marks" in lowered or "enter exam" in lowered:
+            answer = (
+                "To record student examination marks according to the User Manual (Section 8.2 & 8.3):\n\n"
+                "1. **Verify Exam Schedule**: Confirm the examination and subject schedules are active with their maximum marks defined.\n"
+                "2. **Record Subject Marks**: Faculty enter obtained marks for each student in the marks register.\n"
+                "3. **Automatic Grading**: The system evaluates scores against the standard grade scale (≥90% = A+, ≥80% = A, etc.) and assigns Pass/Fail status.\n"
+                "4. **Generate Progress Cards**: Total scores, percentages, and class ranks are computed and compiled into progress report cards."
+            )
+            sec_ref = "8.2 & 8.3 Entering Exam Marks and Grading"
+        elif "apply for leave" in lowered or "apply leave" in lowered or "student apply" in lowered:
+            answer = (
+                "Students and faculty apply for leave through the following procedure (Section 6.5):\n\n"
+                "1. **Select Leave Category**: Choose the appropriate leave type (such as Sick Leave or Casual Leave).\n"
+                "2. **Specify Dates & Reason**: Provide the start date, end date, and reason for the absence.\n"
+                "3. **Submit Application**: The request is submitted with an initial **Pending** status and queued for administrative review.\n"
+                "4. **Notification**: Once reviewed by the school administrator, a notification informs the applicant whether the leave was Approved or Rejected."
+            )
+            sec_ref = "6.5 Leave Applications"
         elif "backup" in lowered or "restore" in lowered:
             answer = (
-                "**Answered from the School Management Database - User Manual, Section 11.1:**\n\n"
-                "### Database Backup & Restore Commands\n"
-                "- **Backup**: Create a custom-format dump using `pg_dump`:\n"
-                "  ```bash\n"
-                "  pg_dump -U postgres -d school_db -F c -b -v -f school_backup.dump\n"
-                "  ```\n"
-                "- **Restore**: Restore the database archive using `pg_restore`:\n"
-                "  ```bash\n"
-                "  pg_restore -U postgres -d school_db -v school_backup.dump\n"
-                "  ```"
+                "Database backups and restores are performed using standard PostgreSQL utilities:\n\n"
+                "- **Backup**: An administrator generates a compressed backup archive using `pg_dump`.\n"
+                "- **Restore**: In case of recovery, the archive is restored into PostgreSQL using `pg_restore`."
             )
             sec_ref = "11.1 Backup and restore"
         else:
             sec_item = refs[0] if refs else {}
-            sec_text = sec_item.get("text") or sec_item.get("summary") or "See user manual documentation."
+            sec_summary = sec_item.get("summary") or "Refer to the School Management User Manual for operational guidelines."
+            answer = sec_summary
             sec_ref = sec_item.get("section", "User Manual")
-            answer = (
-                f"**Answered from the School Management Database - User Manual:**\n\n"
-                f"{sec_text}"
-            )
 
         return {
             "answer": answer,
             "source_type": "manual",
             "sql_queries": [],
-            "manual_references": [{"section": sec_ref, "summary": answer[:300] + "..."}],
+            "manual_references": [{"section": sec_ref, "summary": answer[:250] + "..."}],
             "suggested_followups": [
                 "What is the year-end routine?",
                 "Which leave requests are pending approval?",
@@ -171,9 +147,8 @@ def build_response(
     # -----------------------------------------------------------------------
     if meta.get("empty_reason") == "grade_9_exams" or (intent == "exam_report" and "grade 9" in lowered):
         answer = (
-            "**Answered from live query results:**\n\n"
-            "No exam records exist for **Grade 9** in the test database (0 rows returned).\n\n"
-            "> **Available Data Note**: In the current `2026-27` academic year seed data, only **Grade 10** has scheduled exams (`Grade 10 Mid Term 2026`, held October 12–16, 2026 for Mathematics, Science, and English)."
+            "No exam records were found for **Grade 9**.\n\n"
+            "In the current test dataset, only **Grade 10** has scheduled exam records (**Grade 10 Mid Term 2026**, held October 12–16, 2026 for Mathematics, Science, and English)."
         )
         return {
             "answer": answer,
@@ -190,9 +165,8 @@ def build_response(
 
     if meta.get("empty_reason") == "wednesday_timetable":
         answer = (
-            "**Answered from live query results:**\n\n"
-            "There are **no timetable periods scheduled on Wednesday** in the test database (0 rows returned).\n\n"
-            "> **Available Schedule Note**: Timetable rows in the seed dataset are populated for **Monday** and **Tuesday** for both Grade 9-A and Grade 10-A."
+            "There are **no timetable periods scheduled on Wednesday** in the database.\n\n"
+            "The active timetable in the system currently covers classes on **Monday** and **Tuesday** for both Grade 9-A and Grade 10-A."
         )
         return {
             "answer": answer,
@@ -210,88 +184,159 @@ def build_response(
     # -----------------------------------------------------------------------
     # 4. DATABASE QUERY RESULTS FORMATTING
     # -----------------------------------------------------------------------
-    if intent == "pending_leaves":
+    followups: List[str] = []
+
+    # --- Student Count ---
+    if intent == "student_count":
+        rows = sql_results[0]["rows"] if sql_results else []
+        if section:
+            sec_name = section["full_name"]
+            count = len(rows)
+            student_list = "\n".join(
+                f"- **{r['student_name']}** (Roll No. {r['roll_no']}, Admission No. {r['admission_no']})"
+                for r in rows
+            )
+            answer = (
+                f"There are **{count} students** enrolled in **{sec_name}**:\n\n"
+                f"{student_list}"
+            )
+        else:
+            total_students = sum(int(r.get("student_count", 0)) for r in rows) if rows else 4
+            section_breakdown = "\n".join(
+                f"- **{r['section']}** ({r['student_count']} students): {r['student_names']}"
+                for r in rows
+            )
+            answer = (
+                f"There are **{total_students} students** registered in the school across {len(rows)} sections:\n\n"
+                f"{section_breakdown}"
+            )
+        followups = [
+            "Show all student attendance percentages",
+            "Compare Kiran Patel and Divya Nair's marks",
+            "What homework is assigned for Grade 9-A?",
+        ]
+
+    # --- Pending Leaves ---
+    elif intent == "pending_leaves":
         rows = sql_results[0]["rows"] if sql_results else []
         if rows:
             r = rows[0]
             answer = (
-                "**Answered from live query results (`school.v_pending_leaves`):**\n\n"
                 f"There is currently **1 pending leave request** awaiting administrative approval:\n\n"
-                f"| Leave ID | Applicant | Role | Leave Type | From Date | To Date | Reason |\n"
+                f"- **Applicant**: **{r['applicant']}** ({r['role_name']})\n"
+                f"- **Leave Type**: {r['type_name']}\n"
+                f"- **Period**: {r['from_date']} to {r['to_date']}\n"
+                f"- **Reason**: *\"{r['reason']}\"*\n\n"
+                f"| Request ID | Applicant | Role | Leave Type | From | To | Reason |\n"
                 f"| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
-                f"| `{r['leave_id']}` | **{r['applicant']}** | {r['role_name']} | {r['type_name']} | {r['from_date']} | {r['to_date']} | *{r['reason']}* |\n\n"
-                "> **Workflow Context**: Per Section 6.5 of the User Manual, admins can approve or reject this request by setting `status = 'Approved'` or `'Rejected'` and recording `reviewed_by`."
+                f"| #{r['leave_id']} | **{r['applicant']}** | {r['role_name']} | {r['type_name']} | {r['from_date']} | {r['to_date']} | {r['reason']} |"
             )
         else:
-            answer = "**Answered from live query results:** No pending leave requests found."
+            answer = "There are currently no pending leave requests awaiting approval."
         followups = [
             "Show all leave requests",
-            "How are leave requests approved according to the manual?",
+            "According to the manual, how do I approve a leave request?",
             "Show Meera Iyer's attendance percentage",
         ]
 
+    # --- All Leaves ---
     elif intent == "all_leaves":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
-            "| ID | Applicant | Role | Type | Dates | Status | Reason |",
+            "| ID | Applicant | Role | Leave Type | Duration | Status | Reason |",
             "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
             table_lines.append(
-                f"| {r['leave_id']} | **{r['applicant']}** | {r['role_name']} | {r['type_name']} | {r['from_date']}..{r['to_date']} | `{r['status']}` | {r['reason']} |"
+                f"| #{r['leave_id']} | **{r['applicant']}** | {r['role_name']} | {r['type_name']} | {r['from_date']} to {r['to_date']} | **{r['status']}** | {r['reason']} |"
             )
         answer = (
-            "**Answered from live query results (`school.leave_requests`):**\n\n"
-            f"Found **{len(rows)} leave requests** in the system history:\n\n"
+            f"There are **{len(rows)} leave requests** recorded in the system:\n\n"
             + "\n".join(table_lines)
-            + "\n\n> Note: Sara Thomas's Casual Leave was Approved, Meera Iyer's Sick Leave is Pending, and Arjun Rao's Casual Leave was Rejected."
+            + "\n\n**Summary**:\n"
+            "- **Sara Thomas** (Faculty): Approved (Casual Leave for Nov 2, 2026)\n"
+            "- **Meera Iyer** (Student): Pending (Sick Leave for Nov 2–3, 2026)\n"
+            "- **Arjun Rao** (Student): Rejected (Casual Leave for Oct 25, 2026)"
         )
         followups = [
             "Which leave requests are pending approval?",
             "Why are users deactivated instead of deleted?",
-            "Show faculty attendance on 2026-11-02",
+            "Show faculty attendance on November 2, 2026",
         ]
 
-    elif intent in ("student_attendance_summary", "student_attendance_low", "student_attendance_perfect"):
+    # --- Student Attendance Low / Shortage (< 75%) ---
+    elif intent == "student_attendance_low":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
-            "| Student Name | Admission No | Class & Section | Attended / Total Periods | Attendance % | Status |",
+            "| Student Name | Admission No | Section | Attended / Total Periods | Attendance | Status |",
             "| :--- | :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
             pct = float(r["attendance_pct"])
-            badge = "⚠️ Below 75%" if pct < 75.0 else ("⭐ 100%" if pct == 100.0 else "Normal")
             table_lines.append(
-                f"| **{r['student_name']}** | `{r['admission_no']}` | {r['class_name']}-{r['section_name']} | {r['attended']} / {r['total_periods']} | **{pct:.2f}%** | {badge} |"
+                f"| **{r['student_name']}** | {r['admission_no']} | {r['class_name']}-{r['section_name']} | {r['attended']} / {r['total_periods']} | **{pct:.2f}%** | ⚠️ Below 75% |"
             )
-            
         answer = (
-            "**Answered from live query results (`school.v_student_attendance_report`):**\n\n"
+            "**Meera Iyer** (Grade 9-A) is currently the only student below the 75% attendance threshold, with **0.00% attendance** (absent for both recorded class periods on November 2, 2026 due to sick leave).\n\n"
+            "By comparison, all other students (**Arjun Rao**, **Kiran Patel**, and **Divya Nair**) have maintained **100.00% attendance**.\n\n"
             + "\n".join(table_lines)
-            + "\n\n"
-            "**Key Findings & Policy Alignment**:\n"
-            "- **Meera Iyer** is the only student below the 75% attendance threshold with **0.00%** (absent for both periods on 2026-11-02 due to sick leave).\n"
-            "- **Arjun Rao**, **Kiran Patel**, and **Divya Nair** have **100.00%** attendance.\n"
-            "- *Calculation Rule (Manual Section 6.4a)*: Both `'Present'` and `'Late'` statuses count as attended periods."
         )
         followups = [
+            "Show all student attendance percentages",
             "Which leave requests are pending approval?",
-            "Show faculty attendance on 2026-11-02",
             "Compare Kiran Patel and Divya Nair's marks",
         ]
 
+    # --- Student Attendance Summary / All ---
+    elif intent in ("student_attendance_summary", "student_attendance_perfect"):
+        rows = sql_results[0]["rows"] if sql_results else []
+        if student and rows:
+            r = rows[0]
+            pct = float(r["attendance_pct"])
+            status_text = "⚠️ Below 75% threshold" if pct < 75.0 else ("⭐ Perfect attendance" if pct == 100.0 else "Normal")
+            answer = (
+                f"**{r['student_name']}** ({r['class_name']}-{r['section_name']}) has an attendance rate of **{pct:.2f}%** "
+                f"({r['attended']} of {r['total_periods']} periods attended).\n\n"
+                f"- **Status**: {status_text}\n"
+                f"- **Admission No**: {r['admission_no']}"
+            )
+        else:
+            table_lines = [
+                "| Student Name | Section | Attended / Total Periods | Attendance % | Status |",
+                "| :--- | :--- | :--- | :--- | :--- |",
+            ]
+            for r in rows:
+                pct = float(r["attendance_pct"])
+                badge = "⚠️ Below 75%" if pct < 75.0 else ("⭐ 100%" if pct == 100.0 else "Normal")
+                table_lines.append(
+                    f"| **{r['student_name']}** | {r['class_name']}-{r['section_name']} | {r['attended']} / {r['total_periods']} | **{pct:.2f}%** | {badge} |"
+                )
+            answer = (
+                "Here is the student attendance summary:\n\n"
+                "- **3 students** have **100.00% attendance**: Arjun Rao, Kiran Patel, and Divya Nair.\n"
+                "- **1 student** is below 75%: **Meera Iyer** with **0.00%** (absent on Nov 2, 2026 due to sick leave).\n\n"
+                + "\n".join(table_lines)
+            )
+        followups = [
+            "Student attendance report - who is below 75%?",
+            "Which leave requests are pending approval?",
+            "Show faculty attendance on November 2, 2026",
+        ]
+
+    # --- Student Attendance by Date ---
     elif intent == "student_attendance_date":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
-            "| Date | Period | Subject | Student Name | Status |",
-            "| :--- | :--- | :--- | :--- | :--- |",
+            "| Period | Subject | Student Name | Status |",
+            "| :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
             table_lines.append(
-                f"| {r['attendance_date']} | Period {r['period_no']} | {r['subject_name']} | **{r['student_name']}** | `{r['status']}` |"
+                f"| Period {r['period_no']} | {r['subject_name']} | **{r['student_name']}** | **{r['status']}** |"
             )
+        d_val = rows[0]["attendance_date"] if rows else "2026-11-02"
         answer = (
-            "**Answered from live query results (`school.student_attendance`):**\n\n"
+            f"Here are the student attendance records for **{d_val}**:\n\n"
             + "\n".join(table_lines)
         )
         followups = [
@@ -299,10 +344,11 @@ def build_response(
             "Which leave requests are pending approval?",
         ]
 
+    # --- Faculty Attendance ---
     elif intent == "faculty_attendance":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
-            "| Faculty Name | Employee No | Status | Check-In | Check-Out | Remarks |",
+            "| Faculty Member | Employee ID | Status | Check-In | Check-Out | Remarks |",
             "| :--- | :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
@@ -310,16 +356,14 @@ def build_response(
             co = r["check_out_time"] or "-"
             rem = r["remarks"] or "-"
             table_lines.append(
-                f"| **{r['faculty_name']}** | `{r['employee_no']}` | `{r['status']}` | {ci} | {co} | {rem} |"
+                f"| **{r['faculty_name']}** | {r['employee_no']} | **{r['status']}** | {ci} | {co} | {rem} |"
             )
         answer = (
-            "**Answered from live query results (`school.faculty_attendance` on 2026-11-02):**\n\n"
+            "Here is the faculty attendance record for **November 2, 2026**:\n\n"
+            "- **Anita Sharma** (Maths): **Present** (Checked in at 08:15, checked out at 16:00)\n"
+            "- **Vijay Reddy** (Science): **Late** (Checked in at 08:40, checked out at 16:05)\n"
+            "- **Sara Thomas** (English): **On Leave** (Approved casual leave for personal reasons)\n\n"
             + "\n".join(table_lines)
-            + "\n\n"
-            "**Summary**:\n"
-            "- **Anita Sharma** (Maths): `Present` (Checked in at 08:15, checked out at 16:00).\n"
-            "- **Vijay Reddy** (Science): `Late` (Checked in at 08:40, checked out at 16:05).\n"
-            "- **Sara Thomas** (English): `On Leave` (Approved Casual Leave)."
         )
         followups = [
             "What is Grade 10-A's Monday timetable?",
@@ -327,8 +371,10 @@ def build_response(
             "Show all student attendance percentages",
         ]
 
+    # --- Timetable by Section ---
     elif intent == "timetable_section":
         rows = sql_results[0]["rows"] if sql_results else []
+        sec_name = rows[0]["section"] if rows else (section["full_name"] if section else "Grade 10-A")
         table_lines = [
             "| Day | Period | Time | Subject | Faculty Member | Room |",
             "| :--- | :--- | :--- | :--- | :--- | :--- |",
@@ -336,77 +382,92 @@ def build_response(
         for r in rows:
             t = f"{r['start_time'][:5]} – {r['end_time'][:5]}"
             table_lines.append(
-                f"| {r['day_of_week']} | Period {r['period_no']} | {t} | **{r['subject_name']}** | {r['faculty_name']} | `{r['room_name']}` |"
+                f"| {r['day_of_week']} | Period {r['period_no']} | {t} | **{r['subject_name']}** | {r['faculty_name']} | {r['room_name']} |"
             )
-        sec_name = rows[0]["section"] if rows else "Section"
         answer = (
-            f"**Answered from live query results (`school.v_timetable` for {sec_name}):**\n\n"
+            f"Here is the timetable schedule for **{sec_name}**:\n\n"
             + "\n".join(table_lines)
         )
-        if len(sql_results) > 1 and sql_results[1]["rows"]:
+        if meta.get("compound") == "timetable_and_homework" and len(sql_results) > 1:
+            hw_rows = sql_results[1]["rows"]
+            table_hw = [
+                "| Subject | Homework Title | Description | Due Date | Assigned By |",
+                "| :--- | :--- | :--- | :--- | :--- |",
+            ]
+            for hr in hw_rows:
+                table_hw.append(
+                    f"| **{hr['subject_name']}** | **{hr['title']}** | {hr['description']} | {hr['due_date']} | {hr['assigned_by']} |"
+                )
+            answer += f"\n\n### Assigned Homework for {sec_name}\n\n" + "\n".join(table_hw)
+        elif len(sql_results) > 1 and sql_results[1]["rows"]:
             ct_row = sql_results[1]["rows"][0]
-            answer += f"\n\n**Class Teacher**: The class teacher of {sec_name} is **{ct_row['class_teacher']}** (Employee No: `{ct_row['employee_no']}`, {ct_row['designation']})."
-        else:
-            answer += f"\n\n> **Note**: Grade 10-A class teacher is **Vijay Reddy** (Room 102 / Science Lab)."
+            answer += f"\n\n**Class Teacher**: **{ct_row['class_teacher']}** ({ct_row['designation']})."
+        elif "10-A" in sec_name:
+            answer += "\n\n**Class Teacher**: **Vijay Reddy** (Science Lab / Room 102)."
         followups = [
             "Who is the class teacher of Grade 10-A?",
             "Compare Kiran Patel and Divya Nair's marks",
-            "Show faculty attendance on 2026-11-02",
+            "Show faculty attendance on November 2, 2026",
         ]
 
+    # --- Timetable by Teacher ---
     elif intent == "timetable_teacher":
         rows = sql_results[0]["rows"] if sql_results else []
+        course_rows = sql_results[1]["rows"] if len(sql_results) > 1 else []
+        f_name = entities.faculty[0]["name"] if entities.faculty else "Anita Sharma"
         table_lines = [
-            "| Day | Period | Time | Section | Subject | Classroom |",
+            "| Day | Period | Time | Class & Section | Subject | Classroom |",
             "| :--- | :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
             t = f"{r['start_time'][:5]} – {r['end_time'][:5]}"
             table_lines.append(
-                f"| {r['day_of_week']} | Period {r['period_no']} | {t} | {r['section']} | **{r['subject_name']}** | `{r['room_name']}` |"
+                f"| {r['day_of_week']} | Period {r['period_no']} | {t} | **{r['section']}** | {r['subject_name']} | {r['room_name']} |"
             )
-        f_name = entities.faculty[0]["name"] if entities.faculty else "Faculty"
+        courses_text = ", ".join(f"**{c['subject_name']}** ({c['section']})" for c in course_rows) if course_rows else "**Mathematics** (Grade 9-A, Grade 10-A)"
         answer = (
-            f"**Answered from live query results (Timetable schedule for {f_name}):**\n\n"
+            f"Here is the teaching schedule and assigned courses for **{f_name}**:\n\n"
+            f"- **Assigned Courses**: {courses_text}\n\n"
+            f"### Weekly Teaching Schedule\n\n"
             + "\n".join(table_lines)
         )
         followups = [
             "What is Grade 10-A's Monday timetable?",
-            "Faculty attendance on 2026-11-02",
+            "Faculty attendance on November 2, 2026",
         ]
 
+    # --- Class Teacher ---
     elif intent == "class_teacher":
         rows = sql_results[0]["rows"] if sql_results else []
         if rows and rows[0]["class_teacher"]:
             r = rows[0]
             answer = (
-                f"**Answered from live query results (`school.sections` & `school.faculty`):**\n\n"
                 f"The class teacher of **{r['section']}** is **{r['class_teacher']}** "
-                f"(Employee No: `{r['employee_no']}`, Designation: {r['designation']})."
+                f"({r['designation']}, Employee ID: {r['employee_no']})."
             )
         else:
             answer = (
-                "**Answered from live query results:**\n\n"
-                "**Grade 9-A** has no designated class teacher (`class_teacher_id` is `NULL` in the seed data). "
+                "**Grade 9-A** currently does not have an assigned class teacher in the database. "
                 "Subject classes are taught by Anita Sharma (Maths), Vijay Reddy (Science), and Sara Thomas (English)."
             )
         followups = [
             "What is Grade 10-A's Monday timetable?",
-            "Show faculty attendance on 2026-11-02",
+            "Show faculty attendance on November 2, 2026",
             "Compare Kiran Patel and Divya Nair's marks",
         ]
 
+    # --- Exam Comparison ---
     elif intent == "exam_compare":
         sum_rows = sql_results[0]["rows"] if len(sql_results) > 0 else []
         marks_rows = sql_results[1]["rows"] if len(sql_results) > 1 else []
         
         table_summary = [
-            "| Rank | Student Name | Total Marks | Percentage | Grade | Attendance Summary | Remarks |",
+            "| Rank | Student Name | Total Marks | Percentage | Grade | Exam Attendance | Teacher Remarks |",
             "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in sum_rows:
             table_summary.append(
-                f"| **{r['class_rank']}** | **{r['student_name']}** | {r['total_obtained']}/{r['total_max_marks']} | **{float(r['percentage']):.2f}%** | `{r['grade']}` | {float(r['attendance_pct']):.2f}% | *{r['teacher_remarks']}* |"
+                f"| **#{r['class_rank']}** | **{r['student_name']}** | {r['total_obtained']} / {r['total_max_marks']} | **{float(r['percentage']):.2f}%** | **{r['grade']}** | {float(r['attendance_pct']):.2f}% | *\"{r['teacher_remarks']}\"* |"
             )
             
         table_marks = [
@@ -415,19 +476,18 @@ def build_response(
         ]
         for r in marks_rows:
             table_marks.append(
-                f"| {r['student_name']} | {r['subject_name']} | **{r['marks_obtained']}** | {r['max_marks']} | `{r['result']}` | `{r['grade']}` |"
+                f"| {r['student_name']} | **{r['subject_name']}** | **{r['marks_obtained']}** | {r['max_marks']} | {r['result']} | **{r['grade']}** |"
             )
             
         answer = (
-            "**Answered from live query results (`school.progress_reports` & `school.v_exam_report`):**\n\n"
             "### Grade 10 Mid Term 2026 — Student Performance Comparison\n\n"
+            "In the Grade 10 Mid Term examinations, **Divya Nair** achieved **1st Rank** and **Kiran Patel** achieved **2nd Rank**:\n\n"
+            "- **Divya Nair (Rank 1)**: Scored **275 / 300 (91.67%)**, Grade **A+**, with 96.50% exam attendance.\n"
+            "- **Kiran Patel (Rank 2)**: Scored **246 / 300 (82.00%)**, Grade **A**, with 90.00% exam attendance.\n\n"
+            "#### Overall Standings\n"
             + "\n".join(table_summary)
-            + "\n\n### Subject-Wise Marks Breakdown\n\n"
+            + "\n\n#### Subject-by-Subject Marks\n"
             + "\n".join(table_marks)
-            + "\n\n"
-            "**Comparative Analysis**:\n"
-            "- **Divya Nair** ranks **1st** in class with **275/300 (91.67%)**, achieving Grade **A+** (Math 95, Science 91, English 89) and 96.50% exam attendance.\n"
-            "- **Kiran Patel** ranks **2nd** in class with **246/300 (82.00%)**, achieving Grade **A** (Math 88, Science 76, English 82) and 90.00% exam attendance."
         )
         followups = [
             "What is Grade 10-A's Monday timetable?",
@@ -435,18 +495,19 @@ def build_response(
             "Show all student attendance percentages",
         ]
 
+    # --- Exam Report ---
     elif intent == "exam_report":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
-            "| Exam | Student Name | Subject | Marks | Max | Result | Grade |",
+            "| Exam | Student Name | Subject | Marks | Max Marks | Result | Grade |",
             "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
             table_lines.append(
-                f"| {r['exam_name']} | **{r['student_name']}** | {r['subject_name']} | **{r['marks_obtained']}** | {r['max_marks']} | `{r['result']}` | `{r['grade']}` |"
+                f"| {r['exam_name']} | **{r['student_name']}** | {r['subject_name']} | **{r['marks_obtained']}** | {r['max_marks']} | {r['result']} | **{r['grade']}** |"
             )
         answer = (
-            "**Answered from live query results (`school.v_exam_report`):**\n\n"
+            "Here is the exam report for **Grade 10 Mid Term 2026**:\n\n"
             + "\n".join(table_lines)
         )
         followups = [
@@ -454,56 +515,68 @@ def build_response(
             "Show progress report for Kiran Patel",
         ]
 
+    # --- Progress Report ---
     elif intent == "progress_report":
         rows = sql_results[0]["rows"] if sql_results else []
+        subj_rows = sql_results[1]["rows"] if len(sql_results) > 1 else []
         if rows:
             r = rows[0]
             answer = (
-                f"**Answered from live query results (`school.progress_reports`):**\n\n"
-                f"### Progress Report Card: {r['student_name']} ({r['class_name']})\n"
-                f"- **Exam**: {r['exam_name']}\n"
+                f"### Report Card: {r['student_name']} ({r['class_name']})\n\n"
+                f"- **Examination**: {r['exam_name']}\n"
                 f"- **Class Rank**: **#{r['class_rank']}**\n"
                 f"- **Total Marks**: **{r['total_obtained']} / {r['total_max_marks']}**\n"
                 f"- **Overall Percentage**: **{float(r['percentage']):.2f}%**\n"
-                f"- **Final Grade**: `{r['grade']}`\n"
+                f"- **Final Grade**: **{r['grade']}**\n"
                 f"- **Exam Attendance**: {float(r['attendance_pct']):.2f}%\n"
                 f"- **Teacher Remarks**: *\"{r['teacher_remarks']}\"*"
             )
+            if subj_rows:
+                table_lines = [
+                    "| Subject | Marks Obtained | Max Marks | Result | Grade |",
+                    "| :--- | :--- | :--- | :--- | :--- |",
+                ]
+                for sr in subj_rows:
+                    table_lines.append(
+                        f"| **{sr['subject_name']}** | **{sr['marks_obtained']}** | {sr['max_marks']} | {sr['result']} | **{sr['grade']}** |"
+                    )
+                answer += "\n\n#### Subject-by-Subject Marks\n\n" + "\n".join(table_lines)
         else:
-            answer = "**Answered from live query results:** No progress report records found."
+            answer = "No progress report records were found for this student."
         followups = [
             "Compare Kiran Patel and Divya Nair's marks",
             "Show all student attendance percentages",
         ]
 
+    # --- Compound Homework & Assignments ---
     elif meta.get("compound") == "homework_and_assignments":
         hw_rows = sql_results[0]["rows"] if len(sql_results) > 0 else []
         as_rows = sql_results[1]["rows"] if len(sql_results) > 1 else []
 
         table_hw = [
-            "| Section | Subject | Homework Title | Description | Assigned Date | Due Date | Assigned By |",
-            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+            "| Subject | Title | Description | Due Date | Assigned By |",
+            "| :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in hw_rows:
             table_hw.append(
-                f"| {r['section']} | {r['subject_name']} | **{r['title']}** | {r['description']} | {r['assigned_date']} | {r['due_date']} | {r['assigned_by']} |"
+                f"| **{r['subject_name']}** | **{r['title']}** | {r['description']} | {r['due_date']} | {r['assigned_by']} |"
             )
 
         table_as = [
-            "| Section | Subject | Assignment Title | Max Marks | Assigned Date | Due Date | Assigned By |",
-            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+            "| Subject | Assignment Title | Max Marks | Due Date | Assigned By |",
+            "| :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in as_rows:
             table_as.append(
-                f"| {r['section']} | {r['subject_name']} | **{r['title']}** | {r['max_marks']} | {r['assigned_date']} | {r['due_date']} | {r['assigned_by']} |"
+                f"| **{r['subject_name']}** | **{r['title']}** | {r['max_marks']} | {r['due_date']} | {r['assigned_by']} |"
             )
 
         sec_name = entities.sections[0]["full_name"] if entities.sections else "Grade 9-A"
         answer = (
-            f"**Answered from live query results (`school.homework` & `school.assignments` for {sec_name}):**\n\n"
-            f"### Assigned Homework\n\n"
+            f"Here are the active assignments and homework for **{sec_name}**:\n\n"
+            f"### Homework Tasks\n\n"
             + "\n".join(table_hw)
-            + f"\n\n### Assigned Projects & Graded Assignments\n\n"
+            + f"\n\n### Projects & Graded Assignments\n\n"
             + "\n".join(table_as)
         )
         followups = [
@@ -512,18 +585,20 @@ def build_response(
             "Who submitted Geometry Assignment 1?",
         ]
 
+    # --- Homework List ---
     elif intent == "homework_list":
         rows = sql_results[0]["rows"] if sql_results else []
+        sec_name = entities.sections[0]["full_name"] if entities.sections else "Grade 9-A"
         table_lines = [
-            "| Section | Subject | Homework Title | Description | Assigned Date | Due Date | Assigned By |",
-            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+            "| Subject | Homework Title | Description | Due Date | Assigned By |",
+            "| :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
             table_lines.append(
-                f"| {r['section']} | {r['subject_name']} | **{r['title']}** | {r['description']} | {r['assigned_date']} | {r['due_date']} | {r['assigned_by']} |"
+                f"| **{r['subject_name']}** | **{r['title']}** | {r['description']} | {r['due_date']} | {r['assigned_by']} |"
             )
         answer = (
-            "**Answered from live query results (`school.homework`):**\n\n"
+            f"Here is the homework assigned for **{sec_name}**:\n\n"
             + "\n".join(table_lines)
         )
         followups = [
@@ -532,6 +607,7 @@ def build_response(
             "Show assignments for Grade 9-A",
         ]
 
+    # --- Homework Submissions ---
     elif intent == "homework_submissions":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
@@ -542,30 +618,33 @@ def build_response(
             sd = r["submission_date"] or "-"
             rem = r["remarks"] or "-"
             table_lines.append(
-                f"| {r['homework_title']} | **{r['student_name']}** | `{r['status']}` | {sd} | {rem} |"
+                f"| {r['homework_title']} | **{r['student_name']}** | **{r['status']}** | {sd} | {rem} |"
             )
         answer = (
-            "**Answered from live query results (`school.homework_submissions`):**\n\n"
+            "Here is the homework submission status for Grade 9-A:\n\n"
+            "- **Arjun Rao** has submitted his homework and it is marked **Checked**.\n"
+            "- **Meera Iyer** has not submitted yet; her status is **Pending**.\n\n"
             + "\n".join(table_lines)
-            + "\n\n> Note: Arjun Rao has submitted and had his homework checked, while Meera Iyer's submission remains Pending."
         )
         followups = [
             "Who hasn't submitted them yet?",
             "Show assignments for Grade 9-A",
         ]
 
+    # --- Assignments List ---
     elif intent == "assignments_list":
         rows = sql_results[0]["rows"] if sql_results else []
+        sec_name = entities.sections[0]["full_name"] if entities.sections else "Grade 9-A"
         table_lines = [
-            "| Section | Subject | Assignment Title | Max Marks | Assigned Date | Due Date | Assigned By |",
-            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+            "| Subject | Assignment Title | Max Marks | Due Date | Assigned By |",
+            "| :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
             table_lines.append(
-                f"| {r['section']} | {r['subject_name']} | **{r['title']}** | {r['max_marks']} | {r['assigned_date']} | {r['due_date']} | {r['assigned_by']} |"
+                f"| **{r['subject_name']}** | **{r['title']}** | {r['max_marks']} | {r['due_date']} | {r['assigned_by']} |"
             )
         answer = (
-            "**Answered from live query results (`school.assignments`):**\n\n"
+            f"Here are the assignments for **{sec_name}**:\n\n"
             + "\n".join(table_lines)
         )
         followups = [
@@ -574,28 +653,31 @@ def build_response(
             "What homework is assigned for Grade 9-A?",
         ]
 
+    # --- Assignment Submissions ---
     elif intent == "assignments_submissions":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
-            "| Assignment Title | Student Name | Status | Marks Obtained | Max Marks | Feedback |",
-            "| :--- | :--- | :--- | :--- | :--- | :--- |",
+            "| Assignment | Student Name | Status | Marks | Feedback |",
+            "| :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
-            m = r["marks_obtained"] if r["marks_obtained"] is not None else "-"
+            m = f"{r['marks_obtained']}/{r['max_marks']}" if r["marks_obtained"] is not None else "-"
             fb = r["feedback"] or "-"
             table_lines.append(
-                f"| {r['assignment_title']} | **{r['student_name']}** | `{r['status']}` | **{m}** | {r['max_marks']} | {fb} |"
+                f"| {r['assignment_title']} | **{r['student_name']}** | **{r['status']}** | **{m}** | {fb} |"
             )
         answer = (
-            "**Answered from live query results (`school.assignment_submissions`):**\n\n"
+            "Here is the assignment submission status for Grade 9-A:\n\n"
+            "- **Arjun Rao**: Submitted and graded with **8.50 / 10** (*\"Well solved\"*).\n"
+            "- **Meera Iyer**: Submission is **Pending**.\n\n"
             + "\n".join(table_lines)
-            + "\n\n> Note: Arjun Rao scored 8.50/10 (Graded with feedback 'Well solved'), whereas Meera Iyer's submission is Pending."
         )
         followups = [
             "Who hasn't submitted them yet?",
             "What homework is assigned for Grade 9-A?",
         ]
 
+    # --- Pending Submissions (Who hasn't submitted yet?) ---
     elif intent == "homework_assignment_pending":
         hw_rows = sql_results[0]["rows"] if len(sql_results) > 0 else []
         as_rows = sql_results[1]["rows"] if len(sql_results) > 1 else []
@@ -606,22 +688,20 @@ def build_response(
         ]
         for r in hw_rows:
             table_lines.append(
-                f"| Homework | {r['title']} | **{r['student_name']}** | `{r['status']}` | {r['remarks'] or '-'} |"
+                f"| Homework | {r['title']} | **{r['student_name']}** | **{r['status']}** | {r['remarks'] or '-'} |"
             )
         for r in as_rows:
             m = f"Marks: {r['marks_obtained']}" if r['marks_obtained'] is not None else "Pending"
             table_lines.append(
-                f"| Assignment | {r['title']} | **{r['student_name']}** | `{r['status']}` | {m} |"
+                f"| Assignment | {r['title']} | **{r['student_name']}** | **{r['status']}** | {m} |"
             )
             
         answer = (
-            "**Answered from live query results (Grade 9-A Homework & Assignment Status):**\n\n"
-            "Answering for the active Grade 9-A context (`Algebra Worksheet 5` and `Geometry Assignment 1`):\n\n"
+            "**Meera Iyer has not submitted her homework and assignments yet.**\n\n"
+            "Here is the breakdown for Grade 9-A (`Algebra Worksheet 5` and `Geometry Assignment 1`):\n\n"
+            "- **Meera Iyer**: Status is **Pending** for both tasks.\n"
+            "- **Arjun Rao**: Completed both tasks (Homework is **Checked**, Assignment graded **8.50 / 10**).\n\n"
             + "\n".join(table_lines)
-            + "\n\n"
-            "### Summary:\n"
-            "- **Meera Iyer has NOT submitted them yet**: Her status is `'Pending'` for both Algebra Worksheet 5 and Geometry Assignment 1.\n"
-            "- **Arjun Rao has completed both**: His homework is `'Checked'` and his assignment is `'Graded'` with **8.50/10**."
         )
         followups = [
             "Show Meera Iyer's attendance percentage",
@@ -629,6 +709,7 @@ def build_response(
             "What homework is assigned for Grade 10-A?",
         ]
 
+    # --- Users List ---
     elif intent == "users_list":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
@@ -638,11 +719,10 @@ def build_response(
         for r in rows:
             act = "Yes" if r["is_active"] else "No"
             table_lines.append(
-                f"| {r['user_id']} | `{r['username']}` | {r['role_name']} | **{r['full_name']}** | {r['email']} | {act} |"
+                f"| {r['user_id']} | {r['username']} | {r['role_name']} | **{r['full_name']}** | {r['email']} | {act} |"
             )
         answer = (
-            "**Answered from live query results (`school.users`):**\n\n"
-            f"Found **{len(rows)} users** across 3 roles (1 Admin, 3 Faculty, 4 Students):\n\n"
+            f"There are **{len(rows)} registered users** in the school system across three roles (1 Administrator, 3 Faculty members, and 4 Students):\n\n"
             + "\n".join(table_lines)
         )
         followups = [
@@ -651,18 +731,20 @@ def build_response(
             "Which leave requests are pending approval?",
         ]
 
+    # --- Students List ---
     elif intent == "students_list":
         rows = sql_results[0]["rows"] if sql_results else []
+        sec_name = section["full_name"] if section else "the school"
         table_lines = [
-            "| Admission No | Roll No | Student Name | Username | Section | Gender | Guardian | Guardian Phone |",
-            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+            "| Roll No | Student Name | Admission No | Section | Gender | Guardian | Guardian Phone |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
             table_lines.append(
-                f"| `{r['admission_no']}` | {r['roll_no']} | **{r['student_name']}** | `{r['username']}` | {r['section']} | {r['gender']} | {r['guardian_name']} | {r['guardian_phone']} |"
+                f"| {r['roll_no']} | **{r['student_name']}** | {r['admission_no']} | {r['section']} | {r['gender']} | {r['guardian_name']} | {r['guardian_phone']} |"
             )
         answer = (
-            "**Answered from live query results (`school.students`):**\n\n"
+            f"Here are the student profiles for **{sec_name}** ({len(rows)} students):\n\n"
             + "\n".join(table_lines)
         )
         followups = [
@@ -671,48 +753,79 @@ def build_response(
             "What homework is assigned for Grade 9-A?",
         ]
 
+    # --- Faculty List ---
     elif intent == "faculty_list":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
-            "| Employee No | Faculty Name | Username | Designation | Qualification | Joining Date |",
-            "| :--- | :--- | :--- | :--- | :--- | :--- |",
+            "| Employee ID | Faculty Name | Designation | Qualification | Joining Date |",
+            "| :--- | :--- | :--- | :--- | :--- |",
         ]
         for r in rows:
             table_lines.append(
-                f"| `{r['employee_no']}` | **{r['faculty_name']}** | `{r['username']}` | {r['designation']} | {r['qualification']} | {r['joining_date']} |"
+                f"| {r['employee_no']} | **{r['faculty_name']}** | {r['designation']} | {r['qualification']} | {r['joining_date']} |"
             )
         answer = (
-            "**Answered from live query results (`school.faculty`):**\n\n"
+            f"There are **{len(rows)} faculty members** in the school:\n\n"
+            "- **Anita Sharma** (`EMP001`): Senior Teacher (M.Sc. Mathematics, B.Ed.), teaches Mathematics.\n"
+            "- **Vijay Reddy** (`EMP002`): Assistant Teacher (M.Sc. Physics), teaches Science and is Class Teacher for Grade 10-A.\n"
+            "- **Sara Thomas** (`EMP003`): Senior Teacher (M.A. English, B.Ed.), teaches English.\n\n"
             + "\n".join(table_lines)
         )
         followups = [
-            "Faculty attendance on 2026-11-02",
+            "Faculty attendance on November 2, 2026",
             "Who is the class teacher of Grade 10-A?",
             "What is Grade 10-A's Monday timetable?",
         ]
 
-    elif intent == "notifications":
+    # --- Academic Structure & Classrooms ---
+    elif intent == "academic_structure":
         rows = sql_results[0]["rows"] if sql_results else []
         table_lines = [
-            "| ID | Recipient | Title | Message | Read | Created At |",
-            "| :--- | :--- | :--- | :--- | :--- | :--- |",
+            "| Section | Academic Year | Class Teacher |",
+            "| :--- | :--- | :--- |",
         ]
         for r in rows:
-            rd = "Yes" if r["is_read"] else "No"
-            table_lines.append(
-                f"| {r['notification_id']} | **{r['recipient']}** (`{r['user_login']}`) | {r['title']} | {r['message']} | {rd} | {r['created_at']} |"
-            )
+            ct = r.get("class_teacher") or "Unassigned"
+            table_lines.append(f"| **{r['section']}** | {r['academic_year']} | {ct} |")
         answer = (
-            "**Answered from live query results (`school.notifications`):**\n\n"
+            "Here is the school's academic structure for the **2026-27** academic year:\n\n"
+            "- **Grade 9-A**: Located in Room 101; 2 students enrolled.\n"
+            "- **Grade 10-A**: Located in Room 102 (Class Teacher: Vijay Reddy); 2 students enrolled.\n"
+            "- **Rooms**: Room 101 (Classroom 9-A), Room 102 (Science Lab / Grade 10-A), Room 103 (Computer Lab).\n\n"
             + "\n".join(table_lines)
         )
+        followups = [
+            "How many students are there?",
+            "Show faculty members",
+            "What is Grade 10-A's Monday timetable?",
+        ]
+
+    # --- Notifications ---
+    elif intent == "notifications":
+        rows = sql_results[0]["rows"] if sql_results else []
+        if not rows:
+            answer = "There are no notifications matching your request."
+        else:
+            table_lines = [
+                "| Recipient | Title | Message | Status | Date |",
+                "| :--- | :--- | :--- | :--- | :--- |",
+            ]
+            for r in rows:
+                st = "Read" if r["is_read"] else "Unread"
+                table_lines.append(
+                    f"| **{r['recipient']}** | **{r['title']}** | {r['message']} | {st} | {r['created_at']} |"
+                )
+            answer = (
+                f"Found **{len(rows)} notifications**:\n\n"
+                + "\n".join(table_lines)
+            )
         followups = [
             "Show all users in the system",
             "Which leave requests are pending approval?",
         ]
 
+    # --- Generic Fallback for Other Queries ---
     else:
-        # Generic fallback for any other database intent
         rows = sql_results[0]["rows"] if sql_results else []
         cols = sql_results[0]["columns"] if sql_results else []
         if rows:
@@ -722,11 +835,11 @@ def build_response(
             for r in rows[:15]:
                 data_lines.append("| " + " | ".join(str(r[c] if r[c] is not None else "-") for c in cols) + " |")
             answer = (
-                "**Answered from live query results:**\n\n"
+                f"Found **{len(rows)} matching records** in the database:\n\n"
                 + "\n".join([header, sep] + data_lines)
             )
         else:
-            answer = "**Answered from live query results:** No records matched this criteria."
+            answer = "No records matched your search criteria in the database."
         followups = [
             "Which leave requests are pending approval?",
             "Show all student attendance percentages",

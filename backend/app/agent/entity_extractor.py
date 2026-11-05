@@ -161,16 +161,16 @@ def extract_entities(text: str, session: Optional[SessionState] = None) -> Extra
     matched_sections: List[Dict[str, Any]] = []
     matched_classes: List[str] = []
     
-    if "grade 10-a" in lowered or "10-a" in lowered or "grade 10 a" in lowered:
+    if re.search(r"\b(grade\s*10[- ]?a|10[- ]?a|class\s*10[- ]?a)\b", lowered):
         matched_sections.append(KNOWN_SECTIONS[1])
         matched_classes.append("Grade 10")
-    elif "grade 9-a" in lowered or "9-a" in lowered or "grade 9 a" in lowered:
+    elif re.search(r"\b(grade\s*9[- ]?a|9[- ]?a|class\s*9[- ]?a)\b", lowered):
         matched_sections.append(KNOWN_SECTIONS[0])
         matched_classes.append("Grade 9")
-    elif "grade 10" in lowered or "10th" in lowered or "class 10" in lowered:
+    elif re.search(r"\b(grade\s*10|class\s*10|10th)\b", lowered):
         matched_classes.append("Grade 10")
         matched_sections.append(KNOWN_SECTIONS[1])
-    elif "grade 9" in lowered or "9th" in lowered or "class 9" in lowered:
+    elif re.search(r"\b(grade\s*9|class\s*9|9th)\b", lowered):
         matched_classes.append("Grade 9")
         matched_sections.append(KNOWN_SECTIONS[0])
         

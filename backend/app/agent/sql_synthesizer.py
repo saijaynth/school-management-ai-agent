@@ -124,8 +124,8 @@ def synthesize_and_execute(
         )
         queries_to_run.append((sql, f"Query faculty attendance check-ins and statuses on {date_val}"))
     elif intent == "timetable_section":
-        sec_name = section["full_name"] if section else "Grade 10-A"
-        sec_id = section["section_id"] if section else 2
+        sec_name = section["full_name"] if section else (student["section"] if student else "Grade 10-A")
+        sec_id = section["section_id"] if section else (student["section_id"] if student else 2)
         if weekday:
             sql = (
                 f"SELECT section, day_of_week, period_no, start_time, end_time, "
@@ -144,6 +144,20 @@ def synthesize_and_execute(
                 f"ORDER BY day_of_week, period_no;"
             )
             queries_to_run.append((sql, f"Query {sec_name} weekly timetable"))
+
+        if "homework" in lowered:
+            sql_hw = (
+                f"SELECT sub.subject_name, h.title, h.description, h.due_date, "
+                f"u.first_name || ' ' || COALESCE(u.last_name, '') AS assigned_by "
+                f"FROM school.homework h "
+                f"JOIN school.subjects sub ON sub.subject_id = h.subject_id "
+                f"JOIN school.faculty f ON f.faculty_id = h.faculty_id "
+                f"JOIN school.users u ON u.user_id = f.user_id "
+                f"WHERE h.section_id = {sec_id} "
+                f"ORDER BY h.homework_id;"
+            )
+            queries_to_run.append((sql_hw, f"Query assigned homework for {sec_name}"))
+            meta["compound"] = "timetable_and_homework"
 
         if "class teacher" in lowered or "teacher" in lowered:
             sql_ct = (
@@ -174,6 +188,16 @@ def synthesize_and_execute(
             f"ORDER BY t.day_of_week, p.period_no;"
         )
         queries_to_run.append((sql, f"Query teaching schedule for {f_name}"))
+        sql_courses = (
+            f"SELECT c.class_name || '-' || sec.section_name AS section, sub.subject_name "
+            f"FROM school.course_assignments ca "
+            f"JOIN school.sections sec ON sec.section_id = ca.section_id "
+            f"JOIN school.classes c ON c.class_id = sec.class_id "
+            f"JOIN school.subjects sub ON sub.subject_id = ca.subject_id "
+            f"WHERE ca.faculty_id = {f_id} "
+            f"ORDER BY c.class_name, sec.section_name;"
+        )
+        queries_to_run.append((sql_courses, f"Query assigned courses for {f_name}"))
     elif intent == "class_teacher":
         sec_id = section["section_id"] if section else 2
         sec_name = section["full_name"] if section else "Grade 10-A"
@@ -193,11 +217,12 @@ def synthesize_and_execute(
         sql_summary = (
             "SELECT pr.class_rank, "
             "u.first_name || ' ' || COALESCE(u.last_name, '') AS student_name, "
-            "pr.total_obtained, pr.total_max_marks, pr.percentage, pr.grade, "
+            "pr.total_obtained, pr.total_max_marks, pr.percentage, gs.grade, "
             "pr.attendance_pct, pr.teacher_remarks "
             "FROM school.progress_reports pr "
             "JOIN school.students s ON s.student_id = pr.student_id "
             "JOIN school.users u ON u.user_id = s.user_id "
+            "JOIN school.grade_scale gs ON gs.grade_id = pr.grade_id "
             "ORDER BY pr.class_rank ASC;"
         )
         queries_to_run.append((sql_summary, "Query Grade 10 Mid Term student rankings and total marks"))
@@ -226,19 +251,28 @@ def synthesize_and_execute(
     elif intent == "progress_report":
         s_id = student["student_id"] if student else 3
         s_name = student["name"] if student else "Kiran Patel"
+        s_first = student["first_name"] if student else "Kiran"
         sql = (
             f"SELECT pr.report_id, e.exam_name, "
             f"u.first_name || ' ' || COALESCE(u.last_name, '') AS student_name, "
             f"c.class_name, pr.total_obtained, pr.total_max_marks, pr.percentage, "
-            f"pr.grade, pr.class_rank, pr.attendance_pct, pr.teacher_remarks "
+            f"gs.grade, pr.class_rank, pr.attendance_pct, pr.teacher_remarks "
             f"FROM school.progress_reports pr "
             f"JOIN school.students s ON s.student_id = pr.student_id "
             f"JOIN school.users u ON u.user_id = s.user_id "
             f"JOIN school.exams e ON e.exam_id = pr.exam_id "
             f"JOIN school.classes c ON c.class_id = e.class_id "
+            f"JOIN school.grade_scale gs ON gs.grade_id = pr.grade_id "
             f"WHERE s.student_id = {s_id};"
         )
         queries_to_run.append((sql, f"Query progress report card for {s_name}"))
+        sql_subj = (
+            f"SELECT subject_name, max_marks, marks_obtained, result, grade "
+            f"FROM school.v_exam_report "
+            f"WHERE student_name ILIKE '%{s_first}%' "
+            f"ORDER BY subject_name;"
+        )
+        queries_to_run.append((sql_subj, f"Query subject marks for {s_name}"))
     elif (
         intent in ("homework_list", "assignments_list")
         and "homework" in lowered
@@ -375,19 +409,66 @@ def synthesize_and_execute(
             "ORDER BY u.user_id;"
         )
         queries_to_run.append((sql, "Query users and roles"))
+    elif intent == "student_count":
+        if section:
+            sec_id = section["section_id"]
+            sec_name = section["full_name"]
+            sql = (
+                f"SELECT s.admission_no, s.roll_no, "
+                f"u.first_name || ' ' || COALESCE(u.last_name, '') AS student_name, "
+                f"c.class_name || '-' || sec.section_name AS section, "
+                f"s.gender, s.guardian_name "
+                f"FROM school.students s "
+                f"JOIN school.users u ON u.user_id = s.user_id "
+                f"JOIN school.sections sec ON sec.section_id = s.section_id "
+                f"JOIN school.classes c ON c.class_id = sec.class_id "
+                f"WHERE sec.section_id = {sec_id} "
+                f"ORDER BY s.roll_no;"
+            )
+            queries_to_run.append((sql, f"Count students enrolled in {sec_name}"))
+        else:
+            sql = (
+                "SELECT c.class_name || '-' || sec.section_name AS section, "
+                "COUNT(s.student_id) AS student_count, "
+                "STRING_AGG(u.first_name || ' ' || COALESCE(u.last_name, ''), ', ') AS student_names "
+                "FROM school.sections sec "
+                "JOIN school.classes c ON c.class_id = sec.class_id "
+                "LEFT JOIN school.students s ON s.section_id = sec.section_id "
+                "LEFT JOIN school.users u ON u.user_id = s.user_id "
+                "GROUP BY c.class_name, sec.section_name "
+                "ORDER BY c.class_name, sec.section_name;"
+            )
+            queries_to_run.append((sql, "Count total students enrolled across all sections"))
     elif intent == "students_list":
-        sql = (
-            "SELECT s.student_id, u.username, s.admission_no, s.roll_no, "
-            "u.first_name || ' ' || COALESCE(u.last_name, '') AS student_name, "
-            "c.class_name || '-' || sec.section_name AS section, "
-            "s.gender, s.guardian_name, s.guardian_phone "
-            "FROM school.students s "
-            "JOIN school.users u ON u.user_id = s.user_id "
-            "JOIN school.sections sec ON sec.section_id = s.section_id "
-            "JOIN school.classes c ON c.class_id = sec.class_id "
-            "ORDER BY s.student_id;"
-        )
-        queries_to_run.append((sql, "Query student profiles"))
+        if section:
+            sec_id = section["section_id"]
+            sec_name = section["full_name"]
+            sql = (
+                f"SELECT s.student_id, u.username, s.admission_no, s.roll_no, "
+                f"u.first_name || ' ' || COALESCE(u.last_name, '') AS student_name, "
+                f"c.class_name || '-' || sec.section_name AS section, "
+                f"s.gender, s.guardian_name, s.guardian_phone "
+                f"FROM school.students s "
+                f"JOIN school.users u ON u.user_id = s.user_id "
+                f"JOIN school.sections sec ON sec.section_id = s.section_id "
+                f"JOIN school.classes c ON c.class_id = sec.class_id "
+                f"WHERE sec.section_id = {sec_id} "
+                f"ORDER BY s.roll_no;"
+            )
+            queries_to_run.append((sql, f"Query student roster for {sec_name}"))
+        else:
+            sql = (
+                "SELECT s.student_id, u.username, s.admission_no, s.roll_no, "
+                "u.first_name || ' ' || COALESCE(u.last_name, '') AS student_name, "
+                "c.class_name || '-' || sec.section_name AS section, "
+                "s.gender, s.guardian_name, s.guardian_phone "
+                "FROM school.students s "
+                "JOIN school.users u ON u.user_id = s.user_id "
+                "JOIN school.sections sec ON sec.section_id = s.section_id "
+                "JOIN school.classes c ON c.class_id = sec.class_id "
+                "ORDER BY s.student_id;"
+            )
+            queries_to_run.append((sql, "Query all student profiles"))
     elif intent == "faculty_list":
         sql = (
             "SELECT f.faculty_id, u.username, f.employee_no, "
@@ -412,12 +493,31 @@ def synthesize_and_execute(
         )
         queries_to_run.append((sql, "Query academic structure and sections"))
     elif intent == "notifications":
+        where_clauses = []
+        if student:
+            where_clauses.append(f"u.user_id = {student['user_id']}")
+        elif faculty:
+            where_clauses.append(f"u.user_id = {faculty['user_id']}")
+        elif "stu_arjun" in lowered:
+            where_clauses.append("u.username = 'stu_arjun'")
+        elif "stu_meera" in lowered:
+            where_clauses.append("u.username = 'stu_meera'")
+        elif "stu_kiran" in lowered:
+            where_clauses.append("u.username = 'stu_kiran'")
+        elif "stu_divya" in lowered:
+            where_clauses.append("u.username = 'stu_divya'")
+            
+        if "unread" in lowered:
+            where_clauses.append("n.is_read = FALSE")
+            
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
         sql = (
             "SELECT n.notification_id, u.username AS user_login, "
             "u.first_name || ' ' || COALESCE(u.last_name, '') AS recipient, "
             "n.title, n.message, n.is_read, n.created_at "
             "FROM school.notifications n "
             "JOIN school.users u ON u.user_id = n.user_id "
+            f"{where_sql} "
             "ORDER BY n.notification_id;"
         )
         queries_to_run.append((sql, "Query user notifications"))

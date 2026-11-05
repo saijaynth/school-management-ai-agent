@@ -59,7 +59,7 @@ export default function ChatWindow({
   summary: import("../types").SchemaSummaryResponse | null;
 }) {
   const [input, setInput] = useState("");
-  const [showSql, setShowSql] = useState(true);
+  const [showSql, setShowSql] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -114,11 +114,12 @@ export default function ChatWindow({
               content={m.content}
               thinking={m.thinking}
               failed={m.failed}
-              sourceType={showSql ? m.anytime?.source_type : "clarification"}
-              sqlQueries={showSql ? m.anytime?.sql_queries ?? [] : []}
+              sourceType={m.anytime?.source_type}
+              sqlQueries={m.anytime?.sql_queries ?? []}
               manualReferences={m.anytime?.manual_references ?? []}
               followups={m.anytime?.suggested_followups}
               onFollowup={(q) => onSend(displayFollowup(q))}
+              globalShowSql={showSql}
             />
           ))}
           <LoadingSteps active={loading} />

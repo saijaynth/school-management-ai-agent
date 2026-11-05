@@ -46,6 +46,7 @@ export default function MessageBubble({
   followups,
   onFollowup,
   failed,
+  globalShowSql = false,
 }: {
   role: "user" | "assistant";
   content: string;
@@ -56,8 +57,10 @@ export default function MessageBubble({
   followups?: string[];
   onFollowup?: (q: string) => void;
   failed?: boolean;
+  globalShowSql?: boolean;
 }) {
-  const [showData, setShowData] = useState(true);
+  const [userToggled, setUserToggled] = useState<boolean | null>(null);
+  const showData = userToggled !== null ? userToggled : globalShowSql;
   const isUser = role === "user";
 
   if (isUser) {
@@ -81,10 +84,10 @@ export default function MessageBubble({
           <SourceBadge source={sourceType} />
           {sourceType && (sourceType === "database" || sourceType === "hybrid") && sqlQueries?.length ? (
             <button
-              onClick={() => setShowData((v) => !v)}
-              className="rounded-full border border-slate-200 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+              onClick={() => setUserToggled(!showData)}
+              className="rounded-full border border-slate-200 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition"
             >
-              {showData ? "Hide" : "Show"} Executed SQL &amp; Data ({sqlQueries.length})
+              {showData ? "Hide" : "Show"} SQL &amp; Data ({sqlQueries.length})
             </button>
           ) : null}
         </div>

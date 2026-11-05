@@ -321,3 +321,4 @@ def get_full_sql_knowledge_corpus() -> List[KnowledgeFact]:
             metadata={"manual_section": "Section 12: Database Maintenance and Backups"},
         ),
     ]
+
