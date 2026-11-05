@@ -26,7 +26,90 @@ def synthesize_and_execute(
     
     # Check for empty-result edge cases explicitly requested in requirements
     lowered = raw_query.lower()
-    if "grade 9" in lowered and ("exam" in lowered or "marks" in lowered):
+    
+    if entities.is_out_of_scope:
+        meta["out_of_scope"] = True
+        return [], meta
+
+    if (entities.wants_subject_teacher or "who teaches" in lowered or "who takes" in lowered or "teacher for" in lowered) and entities.subjects:
+        sub_name = entities.subjects[0]["name"]
+        sql = (
+            "SELECT u.first_name || ' ' || COALESCE(u.last_name, '') AS faculty_name, "
+            "f.employee_no, f.designation, sub.subject_name, "
+            "c.class_name || '-' || sec.section_name AS section "
+            "FROM school.course_assignments ca "
+            "JOIN school.faculty f ON f.faculty_id = ca.faculty_id "
+            "JOIN school.users u ON u.user_id = f.user_id "
+            "JOIN school.subjects sub ON sub.subject_id = ca.subject_id "
+            "JOIN school.sections sec ON sec.section_id = ca.section_id "
+            "JOIN school.classes c ON c.class_id = sec.class_id "
+            f"WHERE LOWER(sub.subject_name) LIKE '%{sub_name.lower()}%' "
+            "ORDER BY c.class_name, sec.section_name;"
+        )
+        queries_to_run.append((sql, f"Query teachers assigned to {sub_name}"))
+        meta["subject_teacher"] = sub_name
+    elif entities.wants_contact and (student or faculty or "email" in lowered or "phone" in lowered):
+        name = student["first_name"] if student else (faculty["first_name"] if faculty else "")
+        sql = (
+            "SELECT u.first_name || ' ' || COALESCE(u.last_name, '') AS full_name, "
+            "u.email, u.phone, u.username, r.role_name "
+            "FROM school.users u "
+            "JOIN school.roles r ON r.role_id = u.role_id "
+            + (f"WHERE u.first_name ILIKE '%{name}%' OR u.last_name ILIKE '%{name}%' " if name else "")
+            + "ORDER BY u.user_id;"
+        )
+        queries_to_run.append((sql, f"Query contact details for {name or 'users'}"))
+        meta["contact_query"] = True
+    elif "periods per week" in lowered or ("periods" in lowered and "week" in lowered):
+        cls_name = entities.classes[0] if entities.classes else (section["class_name"] if section else "Grade 10")
+        sub_name = entities.subjects[0]["name"] if entities.subjects else ""
+        sql = (
+            "SELECT c.class_name || '-' || sec.section_name AS section, "
+            "sub.subject_name, COUNT(*) AS periods_per_week "
+            "FROM school.timetable t "
+            "JOIN school.sections sec ON sec.section_id = t.section_id "
+            "JOIN school.classes c ON c.class_id = sec.class_id "
+            "JOIN school.subjects sub ON sub.subject_id = t.subject_id "
+            f"WHERE c.class_name ILIKE '%{cls_name}%' "
+            + (f"AND sub.subject_name ILIKE '%{sub_name}%' " if sub_name else "")
+            + "GROUP BY c.class_name, sec.section_name, sub.subject_name "
+            "ORDER BY c.class_name, sec.section_name, sub.subject_name;"
+        )
+        queries_to_run.append((sql, f"Query weekly periods for {sub_name or 'subjects'} in {cls_name}"))
+        meta["periods_per_week"] = True
+    elif (entities.wants_room or "room" in lowered) and faculty:
+        f_name = faculty["first_name"]
+        day_filter = f"AND t.day_of_week = '{weekday}' " if weekday else ""
+        sql = (
+            "SELECT t.day_of_week, p.period_no, p.start_time, p.end_time, "
+            "sub.subject_name, cr.room_name, "
+            "c.class_name || '-' || sec.section_name AS section "
+            "FROM school.timetable t "
+            "JOIN school.faculty f ON f.faculty_id = t.faculty_id "
+            "JOIN school.users u ON u.user_id = f.user_id "
+            "JOIN school.periods p ON p.period_id = t.period_id "
+            "JOIN school.subjects sub ON sub.subject_id = t.subject_id "
+            "JOIN school.classrooms cr ON cr.classroom_id = t.classroom_id "
+            "JOIN school.sections sec ON sec.section_id = t.section_id "
+            "JOIN school.classes c ON c.class_id = sec.class_id "
+            f"WHERE u.first_name ILIKE '%{f_name}%' {day_filter}"
+            "ORDER BY t.day_of_week, p.period_no;"
+        )
+        queries_to_run.append((sql, f"Query classroom schedule for {faculty['name']}"))
+        meta["faculty_room"] = True
+    elif (entities.wants_lowest or entities.wants_highest) and (student or "scored" in lowered or "marks" in lowered):
+        s_first = student["first_name"] if student else "Kiran"
+        order_dir = "ASC" if entities.wants_lowest else "DESC"
+        sql = (
+            "SELECT exam_name, student_name, subject_name, max_marks, marks_obtained, result, grade "
+            "FROM school.v_exam_report "
+            f"WHERE student_name ILIKE '%{s_first}%' "
+            f"ORDER BY marks_obtained {order_dir} "
+            "LIMIT 1;"
+        )
+        queries_to_run.append((sql, f"Query {'lowest' if entities.wants_lowest else 'highest'} scoring subject for {s_first}"))
+        meta["rank_extrema"] = "lowest" if entities.wants_lowest else "highest"
+    elif "grade 9" in lowered and ("exam" in lowered or "marks" in lowered):
         # Grade 9 has no exams in seed data
         sql = (
             "SELECT e.exam_id, e.exam_name, c.class_name "

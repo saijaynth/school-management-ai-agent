@@ -122,14 +122,13 @@ def _local_ml_agent_turn(session_id: str, message: str) -> Dict[str, Any]:
     payload["session_id"] = session_id
 
     # If the response is a clarification or empty, consult the Full SQL Semantic Knowledge Base
-    if payload.get("source_type") == "clarification" or (
-        payload.get("source_type") == "database"
-        and not sql_results
-        and "0" not in payload.get("answer", "")
+    if not meta.get("out_of_scope") and not entities.is_out_of_scope and (
+        (payload.get("source_type") == "clarification" and "School Management AI Assistant" not in payload.get("answer", ""))
+        or (payload.get("source_type") == "database" and not sql_results and "0" not in payload.get("answer", ""))
     ):
         from .semantic_engine import query_full_data_knowledge
         facts = query_full_data_knowledge(message, top_k=1)
-        if facts and facts[0][1] >= 0.22:
+        if facts and facts[0][1] >= 0.35:
             fact, score = facts[0]
             payload["answer"] = f"### {fact.title}\n\n{fact.text}"
             payload["source_type"] = "database"

@@ -20,6 +20,15 @@ class ExtractedEntities:
     thresholds: List[float]
     is_pronoun_reference: bool = False
     refers_to_multi_submission: bool = False
+    wants_email: bool = False
+    wants_phone: bool = False
+    wants_contact: bool = False
+    wants_room: bool = False
+    wants_subject_teacher: bool = False
+    wants_lowest: bool = False
+    wants_highest: bool = False
+    is_out_of_scope: bool = False
+
 
 
 # Known Database Entities
@@ -237,6 +246,24 @@ def extract_entities(text: str, session: Optional[SessionState] = None) -> Extra
                 
     if "submitted them" in lowered or "submit them" in lowered or "submitted both" in lowered:
         refers_multi = True
+
+    # 9. Intent refinement flags
+    wants_email = bool(re.search(r"\be-?mail\b", lowered))
+    wants_phone = bool(re.search(r"\b(?:phone|mobile|cell|contact number)\b", lowered))
+    wants_contact = wants_email or wants_phone or bool(re.search(r"\b(?:contact|details|info)\b", lowered))
+    wants_room = bool(re.search(r"\b(?:room|classroom|where does|location)\b", lowered))
+    wants_subject_teacher = bool(re.search(r"\bwho (?:teaches|takes|is teaching)\b", lowered))
+    wants_lowest = bool(re.search(r"\b(?:lowest|least|worst|minimum)\b", lowered))
+    wants_highest = bool(re.search(r"\b(?:highest|best|top|maximum|topper)\b", lowered))
+    
+    out_of_scope_words = [
+        "weather", "rain", "temperature", "forecast", "cricket", "football",
+        "movie", "song", "joke", "recipe", "cook", "capital of", "president",
+        "prime minister", "stock price", "bitcoin", "quantum physics",
+    ]
+    is_out_of_scope = any(w in lowered for w in out_of_scope_words) and not any(
+        kw in lowered for kw in ["student", "teacher", "class", "exam", "grade", "period", "attendance", "leave"]
+    )
         
     return ExtractedEntities(
         students=matched_students,
@@ -249,5 +276,13 @@ def extract_entities(text: str, session: Optional[SessionState] = None) -> Extra
         thresholds=thresholds,
         is_pronoun_reference=is_pronoun,
         refers_to_multi_submission=refers_multi,
+        wants_email=wants_email,
+        wants_phone=wants_phone,
+        wants_contact=wants_contact,
+        wants_room=wants_room,
+        wants_subject_teacher=wants_subject_teacher,
+        wants_lowest=wants_lowest,
+        wants_highest=wants_highest,
+        is_out_of_scope=is_out_of_scope,
     )
 

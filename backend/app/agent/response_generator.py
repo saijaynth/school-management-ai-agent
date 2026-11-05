@@ -27,6 +27,170 @@ def build_response(
     section = entities.sections[0] if entities.sections else None
     
     # -----------------------------------------------------------------------
+    # 0. TARGETED QUERY DISPATCH
+    # -----------------------------------------------------------------------
+    if meta.get("out_of_scope") or entities.is_out_of_scope:
+        return {
+            "answer": (
+                "I am the **School Management AI Assistant**. I can only assist with information from the "
+                "School Management database and system user manual (such as student records, faculty, timetable, "
+                "attendance, exams, homework, and leave workflows).\n\n"
+                "I don't have access to external information like current weather, sports, or general web topics."
+            ),
+            "source_type": "clarification",
+            "sql_queries": [],
+            "manual_references": [],
+            "suggested_followups": [
+                "Show all student attendance percentages",
+                "Which leave requests are pending approval?",
+                "What is Grade 10-A's Monday timetable?",
+            ],
+            "llm_ready": True,
+        }
+
+    if meta.get("subject_teacher"):
+        sub_name = meta["subject_teacher"]
+        rows = sql_results[0]["rows"] if sql_results else []
+        if rows:
+            primary = rows[0]
+            teacher_name = primary["faculty_name"]
+            sections_str = ", ".join(f"**{r['section']}**" for r in rows)
+            emp_no = primary.get("employee_no", "")
+            desig = primary.get("designation", "Teacher")
+            answer = (
+                f"**{teacher_name}** (`{emp_no}`, {desig}) teaches **{sub_name}** for {sections_str}.\n\n"
+                "| Faculty Name | Employee ID | Subject | Section |\n"
+                "| :--- | :--- | :--- | :--- |\n"
+            )
+            for r in rows:
+                answer += f"| **{r['faculty_name']}** | {r.get('employee_no')} | {r.get('subject_name')} | {r.get('section')} |\n"
+        else:
+            answer = f"No teacher is currently assigned to teach **{sub_name}** in the database records."
+        return {
+            "answer": answer,
+            "source_type": "database",
+            "sql_queries": sql_results,
+            "manual_references": [],
+            "suggested_followups": [
+                f"Show teaching schedule for {rows[0]['faculty_name']}" if rows else "Show all faculty",
+                "Show all course assignments",
+                "What is the timetable for Grade 10-A?",
+            ],
+            "llm_ready": True,
+        }
+
+    if meta.get("contact_query"):
+        rows = sql_results[0]["rows"] if sql_results else []
+        if rows:
+            u = rows[0]
+            answer = (
+                f"**{u['full_name']}**'s email address is **`{u['email']}`**.\n\n"
+                f"- **Username**: `{u['username']}`\n"
+                f"- **Role**: {u.get('role_name', 'User')}\n"
+                f"- **Contact Number**: `{u.get('phone') or 'Not recorded'}`\n"
+            )
+            if len(rows) > 1:
+                answer += "\n### Additional matching records:\n\n| Name | Role | Email | Phone |\n| :--- | :--- | :--- | :--- |\n"
+                for r in rows[1:]:
+                    answer += f"| **{r['full_name']}** | {r.get('role_name')} | `{r.get('email')}` | {r.get('phone')} |\n"
+        else:
+            answer = "No matching user contact details were found in the database."
+        return {
+            "answer": answer,
+            "source_type": "database",
+            "sql_queries": sql_results,
+            "manual_references": [],
+            "suggested_followups": [
+                "Show all student attendance percentages",
+                "Show all faculty members",
+                "What is Grade 10-A's Monday timetable?",
+            ],
+            "llm_ready": True,
+        }
+
+    if meta.get("faculty_room"):
+        rows = sql_results[0]["rows"] if sql_results else []
+        f_name = entities.faculty[0]["name"] if entities.faculty else "The teacher"
+        if rows:
+            room_summaries = [f"**{r['room_name']}** (Period {r['period_no']}, {r['subject_name']})" for r in rows]
+            answer = (
+                f"**{f_name}** teaches in {', and '.join(room_summaries)}.\n\n"
+                "| Day | Period | Time | Subject | Section | Room |\n"
+                "| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            )
+            for r in rows:
+                time_str = f"{r.get('start_time', '')} – {r.get('end_time', '')}"
+                answer += f"| {r.get('day_of_week')} | Period {r.get('period_no')} | {time_str} | **{r.get('subject_name')}** | {r.get('section')} | **{r.get('room_name')}** |\n"
+        else:
+            answer = f"No classroom schedule was found for **{f_name}** with the given filters."
+        return {
+            "answer": answer,
+            "source_type": "database",
+            "sql_queries": sql_results,
+            "manual_references": [],
+            "suggested_followups": [
+                f"Show full weekly schedule for {f_name}",
+                "Show all classrooms",
+                "What is Grade 10-A's Monday timetable?",
+            ],
+            "llm_ready": True,
+        }
+
+    if meta.get("rank_extrema"):
+        extrema = meta["rank_extrema"]
+        rows = sql_results[0]["rows"] if sql_results else []
+        if rows:
+            top_rec = rows[0]
+            answer = (
+                f"**{top_rec['student_name']}** scored {extrema} in **{top_rec['subject_name']}** with "
+                f"**{top_rec['marks_obtained']} marks** out of {top_rec['max_marks']} (Grade **{top_rec['grade']}**, Result: {top_rec['result']}).\n\n"
+                "| Exam | Student | Subject | Marks Obtained | Max Marks | Grade | Result |\n"
+                "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
+                f"| {top_rec['exam_name']} | **{top_rec['student_name']}** | **{top_rec['subject_name']}** | **{top_rec['marks_obtained']}** | {top_rec['max_marks']} | **{top_rec['grade']}** | {top_rec['result']} |\n"
+            )
+        else:
+            answer = "No exam marks were found for this query."
+        return {
+            "answer": answer,
+            "source_type": "database",
+            "sql_queries": sql_results,
+            "manual_references": [],
+            "suggested_followups": [
+                f"Show all marks for {rows[0]['student_name']}" if rows else "Show all exam marks",
+                "Compare Kiran Patel and Divya Nair's performance",
+                "Show Grade 10 Mid Term rank list",
+            ],
+            "llm_ready": True,
+        }
+
+    if meta.get("periods_per_week"):
+        rows = sql_results[0]["rows"] if sql_results else []
+        if rows:
+            r0 = rows[0]
+            total_p = sum(int(r.get("periods_per_week", 0)) for r in rows)
+            answer = (
+                f"There is **{total_p} period per week** scheduled for **{r0['subject_name']}** in **{r0['section']}**.\n\n"
+                "| Section | Subject | Periods Per Week |\n"
+                "| :--- | :--- | :--- |\n"
+            )
+            for r in rows:
+                answer += f"| **{r['section']}** | {r['subject_name']} | **{r['periods_per_week']}** |\n"
+        else:
+            answer = "No timetable periods found for that subject and grade."
+        return {
+            "answer": answer,
+            "source_type": "database",
+            "sql_queries": sql_results,
+            "manual_references": [],
+            "suggested_followups": [
+                "Show full timetable for Grade 10-A",
+                "Show all subjects",
+                "When does Anita Sharma teach Mathematics?",
+            ],
+            "llm_ready": True,
+        }
+
+    # -----------------------------------------------------------------------
     # 1. MUTATION REFUSALS
     # -----------------------------------------------------------------------
     if intent == "mutation_refusal":
