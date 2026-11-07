@@ -48,6 +48,98 @@ def build_response(
             "llm_ready": True,
         }
 
+    if meta.get("person_profile"):
+        if meta.get("student_profile"):
+            rows = sql_results[0]["rows"] if sql_results else []
+            if rows:
+                s = rows[0]
+                rank_val = s.get("class_rank")
+                rank_str = f"Rank #{rank_val} in class" if rank_val else "Enrolled student"
+                pct_val = s.get("percentage")
+                grade_val = s.get("grade")
+                marks_str = f"{pct_val:.2f}% (Grade {grade_val})" if pct_val is not None else "Pending exam evaluation"
+                att_pct = s.get("attendance_pct")
+                att_str = f"{att_pct:.2f}% ({s.get('attended_periods', 0)}/{s.get('total_periods', 0)} periods attended)" if s.get("total_periods") else "100.00%"
+                answer = (
+                    f"**{s['student_name']}** is an enrolled student in **{s['class_section']}**.\n\n"
+                    f"- **Admission Number:** `{s['admission_no']}` (Roll No. {s.get('roll_no', 1)})\n"
+                    f"- **Class & Section:** {s['class_section']}\n"
+                    f"- **Class Teacher:** {s.get('class_teacher_name') or 'Assigned'}\n"
+                    f"- **Attendance:** {att_str}\n"
+                    f"- **Academic Standing:** {rank_str} — scored **{marks_str}**\n"
+                    f"- **Username / Login:** `{s['username']}` ({s.get('email', '')})\n"
+                )
+            else:
+                answer = "Student records were not found for this inquiry."
+            return {
+                "answer": answer,
+                "source_type": "database",
+                "sql_queries": sql_results,
+                "manual_references": [],
+                "suggested_followups": [
+                    f"Show attendance details for {rows[0]['student_name']}" if rows else "Show attendance report",
+                    f"Show exam report for {rows[0]['student_name']}" if rows else "Show exam marks",
+                    "What homework is assigned for their class?",
+                ],
+                "llm_ready": True,
+            }
+
+        elif meta.get("faculty_profile"):
+            f_rows = sql_results[0]["rows"] if sql_results else []
+            c_rows = sql_results[1]["rows"] if len(sql_results) > 1 else []
+            if f_rows:
+                f = f_rows[0]
+                courses_str = ", ".join(f"**{r['subject_name']}** ({r['section']})" for r in c_rows) if c_rows else "Active course assignments"
+                att_status = f.get("today_attendance") or "Present"
+                check_in = f" (Checked in at {f['check_in_time']})" if f.get("check_in_time") else ""
+                answer = (
+                    f"**{f['faculty_name']}** is a faculty member ({f.get('designation', 'Teacher')}).\n\n"
+                    f"- **Employee ID:** `{f['employee_no']}`\n"
+                    f"- **Designation & Qualification:** {f.get('designation', 'Teacher')}, {f.get('qualification', 'M.Sc / B.Ed')}\n"
+                    f"- **Courses Taught:** {courses_str}\n"
+                    f"- **Attendance Status:** {att_status}{check_in}\n"
+                    f"- **Contact:** `{f.get('email', '')}` | `{f.get('phone', 'N/A')}`\n"
+                )
+            else:
+                answer = "Faculty member records were not found for this inquiry."
+            return {
+                "answer": answer,
+                "source_type": "database",
+                "sql_queries": sql_results,
+                "manual_references": [],
+                "suggested_followups": [
+                    f"Show teaching schedule for {f_rows[0]['faculty_name']}" if f_rows else "Show faculty list",
+                    "Show all course assignments",
+                    "What is Grade 10-A's Monday timetable?",
+                ],
+                "llm_ready": True,
+            }
+
+        elif meta.get("admin_profile"):
+            rows = sql_results[0]["rows"] if sql_results else []
+            if rows:
+                u = rows[0]
+                answer = (
+                    f"**{u['full_name']}** (`{u['username']}`) is the **System Administrator**.\n\n"
+                    f"- **Role:** {u.get('role_name', 'Admin')}\n"
+                    f"- **Email:** `{u.get('email')}`\n"
+                    f"- **Permissions:** Configures academic terms, classes, timetables, and approves leave requests.\n"
+                )
+            else:
+                answer = "Admin account details were not found."
+            return {
+                "answer": answer,
+                "source_type": "database",
+                "sql_queries": sql_results,
+                "manual_references": [],
+                "suggested_followups": [
+                    "Which leave requests are pending approval?",
+                    "Show all users in the system",
+                    "What is the year-end routine?",
+                ],
+                "llm_ready": True,
+            }
+
     if meta.get("subject_teacher"):
         sub_name = meta["subject_teacher"]
         rows = sql_results[0]["rows"] if sql_results else []

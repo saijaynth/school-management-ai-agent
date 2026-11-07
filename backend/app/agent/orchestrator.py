@@ -71,6 +71,16 @@ def _local_ml_agent_turn(session_id: str, message: str) -> Dict[str, Any]:
     session = get_session(session_id)
     entities = extract_entities(message, session)
     intent, confidence = predict_intent(message)
+    lowered = message.lower().strip("?.! ")
+
+    # Universal Entity & Profile Resolution
+    if confidence < 0.45:
+        if entities.students or entities.faculty or "admin" in lowered:
+            if any(w in lowered for w in ["who", "tell me", "profile", "detail", "info", "what is", "about"]):
+                intent = "person_profile"
+        elif any(w in lowered for w in ["who is", "who's", "tell me about"]):
+            if entities.students or entities.faculty or "admin" in lowered:
+                intent = "person_profile"
 
     if intent == "homework_assignment_pending" or entities.refers_to_multi_submission:
         if not entities.sections:
@@ -124,9 +134,6 @@ def _local_ml_agent_turn(session_id: str, message: str) -> Dict[str, Any]:
         session_id,
         user_message=message,
         assistant_message=payload["answer"],
-    )
-
-    return payload
     )
 
     return payload

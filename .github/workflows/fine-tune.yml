@@ -1,0 +1,52 @@
+name: Fine-Tune Transfer Learning Model (Hugging Face)
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_model:
+        description: 'Base model to fine-tune'
+        required: true
+        default: 'google/flan-t5-small'
+      epochs:
+        description: 'Number of training epochs'
+        required: false
+        default: '3'
+      batch_size:
+        description: 'Batch size'
+        required: false
+        default: '8'
+
+jobs:
+  fine-tune:
+    name: Fine-Tune Transformer & Publish to HF Hub
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://neondb_owner:npg_Ssqzmd9cDo0l@ep-fancy-cell-bd9rqecw-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require' }}
+      DB_SCHEMA: school
+      LLM_PROVIDER: local
+      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install transformers datasets accelerate huggingface_hub scikit-learn psycopg[binary,pool] pydantic
+
+      - name: Run Fine-Tuning & Publish to Hugging Face
+        run: |
+          python backend/scripts/train_transfer_agent.py \
+            --base-model "${{ github.event.inputs.base_model || 'google/flan-t5-small' }}" \
+            --epochs ${{ github.event.inputs.epochs || '3' }} \
+            --batch-size ${{ github.event.inputs.batch_size || '8' }}

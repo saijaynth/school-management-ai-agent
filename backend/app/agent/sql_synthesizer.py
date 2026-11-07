@@ -31,7 +31,70 @@ def synthesize_and_execute(
         meta["out_of_scope"] = True
         return [], meta
 
-    if (entities.wants_subject_teacher or "who teaches" in lowered or "who takes" in lowered or "teacher for" in lowered) and entities.subjects:
+    if intent == "person_profile" or (
+        (lowered.startswith("who is") or "tell me about" in lowered or "profile of" in lowered or "details of" in lowered or "info on" in lowered)
+        and (student or faculty or "admin" in lowered)
+    ):
+        meta["person_profile"] = True
+        if student:
+            s_id = student["student_id"]
+            sql = (
+                "SELECT s.student_id, u.first_name || ' ' || COALESCE(u.last_name, '') AS student_name, "
+                "u.username, u.email, u.phone, s.admission_no, s.roll_no, "
+                "c.class_name || '-' || sec.section_name AS class_section, "
+                "u_fac.first_name || ' ' || COALESCE(u_fac.last_name, '') AS class_teacher_name, "
+                "COALESCE(att.attendance_pct, 100.0) AS attendance_pct, "
+                "COALESCE(att.attended, 0) AS attended_periods, "
+                "COALESCE(att.total_periods, 0) AS total_periods, "
+                "pr.percentage, gs.grade, pr.class_rank "
+                "FROM school.students s "
+                "JOIN school.users u ON u.user_id = s.user_id "
+                "JOIN school.sections sec ON sec.section_id = s.section_id "
+                "JOIN school.classes c ON c.class_id = sec.class_id "
+                "LEFT JOIN school.faculty f_ct ON f_ct.faculty_id = sec.class_teacher_id "
+                "LEFT JOIN school.users u_fac ON u_fac.user_id = f_ct.user_id "
+                "LEFT JOIN school.v_student_attendance_report att ON att.student_id = s.student_id "
+                "LEFT JOIN school.progress_reports pr ON pr.student_id = s.student_id "
+                "LEFT JOIN school.grade_scale gs ON gs.grade_id = pr.grade_id "
+                f"WHERE s.student_id = {s_id};"
+            )
+            queries_to_run.append((sql, f"Student profile for {student['name']}"))
+            meta["student_profile"] = student
+        elif faculty:
+            f_id = faculty["faculty_id"]
+            sql1 = (
+                "SELECT f.faculty_id, u.first_name || ' ' || COALESCE(u.last_name, '') AS faculty_name, "
+                "u.username, u.email, u.phone, f.employee_no, f.designation, f.qualification, "
+                "fa.status AS today_attendance, fa.check_in "
+                "FROM school.faculty f "
+                "JOIN school.users u ON u.user_id = f.user_id "
+                f"LEFT JOIN school.faculty_attendance fa ON fa.faculty_id = f.faculty_id AND fa.attendance_date = '{date_val}' "
+                f"WHERE f.faculty_id = {f_id};"
+            )
+            sql2 = (
+                "SELECT DISTINCT sub.subject_name, c.class_name || '-' || sec.section_name AS section "
+                "FROM school.course_assignments ca "
+                "JOIN school.subjects sub ON sub.subject_id = ca.subject_id "
+                "JOIN school.sections sec ON sec.section_id = ca.section_id "
+                "JOIN school.classes c ON c.class_id = sec.class_id "
+                f"WHERE ca.faculty_id = {f_id} "
+                "ORDER BY sub.subject_name, section;"
+            )
+            queries_to_run.append((sql1, f"Faculty profile for {faculty['name']}"))
+            queries_to_run.append((sql2, f"Assigned courses for {faculty['name']}"))
+            meta["faculty_profile"] = faculty
+        elif "admin" in lowered:
+            sql = (
+                "SELECT u.user_id, u.first_name || ' ' || COALESCE(u.last_name, '') AS full_name, "
+                "u.username, u.email, u.phone, r.role_name "
+                "FROM school.users u "
+                "JOIN school.roles r ON r.role_id = u.role_id "
+                "WHERE r.role_name = 'Admin' OR u.username = 'admin01';"
+            )
+            queries_to_run.append((sql, "Admin profile"))
+            meta["admin_profile"] = True
+
+    elif (entities.wants_subject_teacher or "who teaches" in lowered or "who takes" in lowered or "teacher for" in lowered) and entities.subjects:
         sub_name = entities.subjects[0]["name"]
         sql = (
             "SELECT u.first_name || ' ' || COALESCE(u.last_name, '') AS faculty_name, "
