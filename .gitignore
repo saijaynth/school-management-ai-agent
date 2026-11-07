@@ -31,6 +31,7 @@ npm_install_log.txt
 *.safetensors
 *.bin
 *.pt
+*.zip
 backend/data/fine_tuned_t5/*.safetensors
 backend/data/fine_tuned_t5/*.bin
 backend/data/fine_tuned_t5/spiece.model

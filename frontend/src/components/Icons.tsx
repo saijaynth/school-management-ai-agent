@@ -129,3 +129,4 @@ export function CheckCircleIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+

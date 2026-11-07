@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  # Full-Stack School Management AI Assistant (FastAPI Backend + React Frontend)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: school-management-ai-app
+    ports:
+      - "8000:7860"
+    environment:
+      - PORT=7860
+      - DATABASE_URL=postgresql://neondb_owner:npg_Ssqzmd9cDo0l@ep-fancy-cell-bd9rqecw-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require
+      - DB_SCHEMA=school
+      - LLM_PROVIDER=local
+    restart: unless-stopped
+
+  # Optional Local PostgreSQL instance (if running offline without AWS Neon)
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: school-postgres-local
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgrespassword
+  #     POSTGRES_DB: school_db
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - ./school_management_postgres92.sql:/docker-entrypoint-initdb.d/init.sql:ro
