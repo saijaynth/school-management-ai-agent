@@ -120,6 +120,7 @@ def _local_ml_agent_turn(session_id: str, message: str) -> Dict[str, Any]:
     if not meta.get("out_of_scope") and not entities.is_out_of_scope and (
         (payload.get("source_type") == "clarification" and "School Management" not in payload.get("answer", ""))
         or (payload.get("source_type") == "database" and not sql_results and "0" not in payload.get("answer", ""))
+        or (payload.get("source_type") == "manual" and "Refer to the School Management" in payload.get("answer", ""))
     ):
         from .semantic_engine import query_full_data_knowledge
         facts = query_full_data_knowledge(message, top_k=1)

@@ -320,6 +320,8 @@ def phase3_api(base: str, skip_llm: bool, run_llm_tests: bool) -> bool:
         "Show the exam marks for Grade 9 students.",
         "Delete all rejected leave requests from the database.",
         "According to the manual, why shouldn't we delete users, and what is the year-end routine?",
+        "Who is Divya Nair?",
+        "Who is Sara Thomas and what does she teach?",
     ]
     for turn_no, q in enumerate(turns, 1):
         try:

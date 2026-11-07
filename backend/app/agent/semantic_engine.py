@@ -21,13 +21,22 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.pipeline import FeatureUnion
 
 from .knowledge_base import KnowledgeFact, get_full_sql_knowledge_corpus
+from .dynamic_knowledge import DynamicFact, build_dynamic_database_facts
 
 
 class UniversalSemanticEngine:
     """Retrieves grounded knowledge facts across any natural English query variation."""
 
     def __init__(self) -> None:
-        self.corpus: List[KnowledgeFact] = get_full_sql_knowledge_corpus()
+        dynamic_facts = []
+        try:
+            dynamic_facts = build_dynamic_database_facts()
+        except Exception:
+            pass
+
+        # Combine dynamic database facts with manual procedural facts
+        manual_facts = get_full_sql_knowledge_corpus()
+        self.corpus = list(dynamic_facts) + list(manual_facts)
         self.doc_texts = [f"{f.title} {f.text}" for f in self.corpus]
 
         # Dual Word + Subword feature union

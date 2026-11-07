@@ -27,32 +27,19 @@ DEFAULT_BASE_MODEL = "google/flan-t5-small"
 
 def build_training_dataset():
     """Build a comprehensive dataset of natural language queries to grounded domain targets."""
-    from app.agent.ml_intent import TRAINING_DATA
+    from app.agent.ml_intent import (
+        TRAINING_DATA,
+        generate_universal_sentence_variations,
+    )
 
     dataset = []
     for query, intent in TRAINING_DATA:
-        # Formulate canonical target representation
         target = f"intent: {intent}"
         dataset.append({"input_text": f"school query: {query.strip()}", "target_text": target})
 
-    # Add variations and profile patterns
-    extra_pairs = [
-        ("who is divya", "intent: person_profile | person: Divya Nair | role: student"),
-        ("who is arjun", "intent: person_profile | person: Arjun Rao | role: student"),
-        ("who is meera", "intent: person_profile | person: Meera Iyer | role: student"),
-        ("who is kiran", "intent: person_profile | person: Kiran Patel | role: student"),
-        ("who is anita", "intent: person_profile | person: Anita Sharma | role: faculty"),
-        ("who is vijay", "intent: person_profile | person: Vijay Reddy | role: faculty"),
-        ("who is sara", "intent: person_profile | person: Sara Thomas | role: faculty"),
-        ("who is admin", "intent: person_profile | person: Ramesh Kumar | role: admin"),
-        ("who is below 75% attendance?", "intent: student_attendance_low | threshold: 75"),
-        ("what is grade 10-a timetable on monday?", "intent: timetable_section | section: Grade 10-A | day: Monday"),
-        ("compare kiran and divya marks", "intent: exam_compare | students: Kiran Patel, Divya Nair"),
-        ("which leave requests are pending?", "intent: pending_leaves | status: Pending"),
-        ("how do i approve leave in the manual?", "intent: manual_workflow | topic: leave_approval"),
-    ]
-
-    for q, t in extra_pairs:
+    # Add enriched universal sentence variations
+    variations = generate_universal_sentence_variations()
+    for q, t in variations:
         dataset.append({"input_text": f"school query: {q}", "target_text": t})
 
     return dataset
@@ -194,3 +181,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

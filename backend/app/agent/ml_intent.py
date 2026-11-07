@@ -248,6 +248,156 @@ TRAINING_DATA: List[Tuple[str, str]] = [
     ("faculty details for vijay", "person_profile"),
 ]
 
+
+def generate_universal_sentence_variations() -> List[Tuple[str, str]]:
+    """Generates hundreds of rich natural language sentence variations grounded in the database."""
+    samples: List[Tuple[str, str]] = []
+    
+    # 1. Students
+    students = [
+        ("Divya", "Divya Nair", "Grade 10-A", "ADM2025004"),
+        ("Arjun", "Arjun Rao", "Grade 9-A", "ADM2025001"),
+        ("Meera", "Meera Iyer", "Grade 9-A", "ADM2025002"),
+        ("Kiran", "Kiran Patel", "Grade 10-A", "ADM2025003"),
+    ]
+    
+    for short, full, sec, adm in students:
+        patterns = [
+            f"who is {short.lower()}",
+            f"who is {full.lower()}",
+            f"tell me about {short.lower()}",
+            f"tell me about {full.lower()}",
+            f"profile of {short.lower()}",
+            f"profile of {full.lower()}",
+            f"can you give me details on {short.lower()}",
+            f"could you check information for student {full.lower()}",
+            f"what class is {short.lower()} in",
+            f"which section does {full.lower()} study in",
+            f"what is the roll number of {short.lower()}",
+            f"admission number for {full.lower()}",
+        ]
+        target = f"intent: person_profile | person: {full} | section: {sec} | role: student"
+        for p in patterns:
+            samples.append((p, target))
+
+        # Attendance variations
+        att_patterns = [
+            f"what is {short.lower()}'s attendance rate",
+            f"how many classes has {full.lower()} attended",
+            f"is {short.lower()} present or absent",
+            f"attendance report for {full.lower()}",
+            f"attendance percentage of {short.lower()}",
+            f"did {full.lower()} attend all lectures",
+        ]
+        att_target = f"intent: student_attendance_summary | student: {full}"
+        for p in att_patterns:
+            samples.append((p, att_target))
+
+        # Exam / Mark variations
+        exam_patterns = [
+            f"what did {short.lower()} score in exams",
+            f"marks obtained by {full.lower()}",
+            f"report card of {short.lower()}",
+            f"grade and marks for {full.lower()}",
+            f"progress report of {short.lower()}",
+            f"did {full.lower()} pass the exam",
+        ]
+        exam_target = f"intent: exam_report | student: {full}"
+        for p in exam_patterns:
+            samples.append((p, exam_target))
+
+        # Homework / Assignment variations
+        hw_patterns = [
+            f"has {short.lower()} submitted homework",
+            f"homework submission status for {full.lower()}",
+            f"did {short.lower()} turn in the assignment",
+            f"is {full.lower()}'s assignment pending",
+        ]
+        hw_target = f"intent: homework_submissions | student: {full}"
+        for p in hw_patterns:
+            samples.append((p, hw_target))
+
+    # 2. Faculty
+    faculty = [
+        ("Anita", "Anita Sharma", "Senior Teacher", "Mathematics"),
+        ("Vijay", "Vijay Reddy", "Assistant Teacher", "Science"),
+        ("Sara", "Sara Thomas", "Teacher", "English"),
+    ]
+    for short, full, desig, subj in faculty:
+        patterns = [
+            f"who is {short.lower()}",
+            f"who is {full.lower()}",
+            f"tell me about teacher {short.lower()}",
+            f"profile of {full.lower()}",
+            f"what does {short.lower()} teach",
+            f"which subject is taught by {full.lower()}",
+            f"designation of {short.lower()}",
+            f"qualification of teacher {full.lower()}",
+        ]
+        target = f"intent: person_profile | person: {full} | designation: {desig} | subject: {subj} | role: faculty"
+        for p in patterns:
+            samples.append((p, target))
+
+        # Faculty schedule & attendance
+        fac_patterns = [
+            f"when does {short.lower()} teach on monday",
+            f"what is {full.lower()}'s timetable on monday",
+            f"which room does {short.lower()} teach in",
+            f"schedule of {full.lower()} on monday",
+            f"was {short.lower()} present on 2026-11-02",
+            f"check in time for {full.lower()} on nov 2",
+        ]
+        fac_target = f"intent: timetable_teacher | faculty: {full}"
+        for p in fac_patterns:
+            samples.append((p, fac_target))
+
+    # 3. Sections & Academic
+    sections = [
+        ("Grade 9-A", "Anita Sharma", "Room 101"),
+        ("Grade 10-A", "Vijay Reddy", "Room 102"),
+    ]
+    for sec, teacher, room in sections:
+        sec_patterns = [
+            f"who is the class teacher of {sec.lower()}",
+            f"class teacher for {sec.lower()}",
+            f"what is the monday schedule for {sec.lower()}",
+            f"timetable for {sec.lower()} on monday",
+            f"what homework is assigned to {sec.lower()}",
+            f"list all assignments for {sec.lower()}",
+            f"which classroom does {sec.lower()} use",
+        ]
+        for p in sec_patterns:
+            samples.append((p, f"intent: timetable_section | section: {sec}"))
+
+    # 4. Superlatives, Aggregates & Policy
+    general_queries = [
+        ("who is below 75% attendance?", "intent: student_attendance_low | threshold: 75"),
+        ("which students have attendance shortage?", "intent: student_attendance_low"),
+        ("who has perfect 100% attendance?", "intent: student_attendance_perfect"),
+        ("who got first rank in class?", "intent: progress_report | rank: 1"),
+        ("top performer in grade 10 mid term", "intent: progress_report | rank: 1"),
+        ("compare kiran and divya exam performance", "intent: exam_compare | students: Kiran Patel, Divya Nair"),
+        ("who scored higher between kiran and divya?", "intent: exam_compare | students: Kiran Patel, Divya Nair"),
+        ("who hasn't submitted their homework yet?", "intent: homework_assignment_pending"),
+        ("pending submissions for algebra worksheet", "intent: homework_submissions"),
+        ("which leave requests are awaiting admin approval?", "intent: pending_leaves | status: Pending"),
+        ("why shouldn't we delete rejected leave requests?", "intent: manual_workflow | topic: no_delete"),
+        ("how do i backup the postgresql database?", "intent: manual_workflow | topic: backup"),
+        ("explain the 4-step year-end routine", "intent: manual_workflow | topic: year_end_routine"),
+        ("how to add a new student step by step", "intent: manual_workflow | topic: add_student"),
+        ("how does admin approve or reject leave?", "intent: manual_workflow | topic: leave_approval"),
+        ("how many students are currently enrolled?", "intent: student_count"),
+        ("total count of faculty members", "intent: faculty_list"),
+        ("list all classrooms and their seating capacity", "intent: academic_structure"),
+        ("who is the system administrator?", "intent: person_profile | person: Ramesh Kumar | role: admin"),
+        ("profile of admin_ramesh", "intent: person_profile | person: Ramesh Kumar | role: admin"),
+    ]
+    for q, t in general_queries:
+        samples.append((q, t))
+
+    return samples
+
+
 _pipeline: Pipeline | None = None
 _lock = threading.Lock()
 
@@ -266,9 +416,13 @@ def get_intent_classifier() -> Pipeline:
             except Exception:
                 pass
 
-        # Train new model
+        # Train new model on base dataset plus universal sentence variations
         texts = [t[0] for t in TRAINING_DATA]
         labels = [t[1] for t in TRAINING_DATA]
+        for q, t in generate_universal_sentence_variations():
+            lbl = t.split("|")[0].replace("intent:", "").strip()
+            texts.append(q)
+            labels.append(lbl)
 
         pipeline = Pipeline(
             [
@@ -379,6 +533,9 @@ def predict_intent(text: str) -> Tuple[str, float]:
         or "who has not submitted" in lowered
         or "submitted them yet" in lowered
         or "pending submissions" in lowered
+        or "who hasn't turned in" in lowered
+        or "who has not turned in" in lowered
+        or "turned in yet" in lowered
     ):
         return "homework_assignment_pending", 1.0
     if "homework" in lowered and "assignment" in lowered:
@@ -405,6 +562,15 @@ def predict_intent(text: str) -> Tuple[str, float]:
         if "faculty" in lowered or "teacher" in lowered:
             return "faculty_attendance", 1.0
         return "student_attendance_summary", 1.0
+
+    # 13. Person Profile / Identity / Who is / Tell me about
+    if any(p in lowered for p in ["who is", "who are", "tell me about", "profile of", "details of", "information on", "info on", "about student", "about teacher", "about faculty", "who was"]):
+        if not ("class teacher" in lowered or "users" in lowered or "students" in lowered or "teachers" in lowered or "leaves" in lowered):
+            return "person_profile", 1.0
+
+    # 14. Performance Ranking / Top Student / Rank
+    if any(p in lowered for p in ["top student", "first rank", "highest marks", "rank 1", "rank #1", "who scored top", "topper", "highest score"]):
+        return "progress_report", 1.0
 
     # Fallback to ML ensemble classifier
     clf = get_intent_classifier()
