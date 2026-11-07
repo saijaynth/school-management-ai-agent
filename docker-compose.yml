@@ -8,9 +8,9 @@ services:
       dockerfile: Dockerfile
     container_name: school-management-ai-app
     ports:
-      - "8000:7860"
+      - "8000:8000"
     environment:
-      - PORT=7860
+      - PORT=8000
       - DATABASE_URL=postgresql://neondb_owner:npg_Ssqzmd9cDo0l@ep-fancy-cell-bd9rqecw-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require
       - DB_SCHEMA=school
       - LLM_PROVIDER=local
@@ -28,3 +28,4 @@ services:
   #     - "5432:5432"
   #   volumes:
   #     - ./school_management_postgres92.sql:/docker-entrypoint-initdb.d/init.sql:ro
+

@@ -1,11 +1,3 @@
-"""Tool-calling and Local ML agent orchestrator.
-
-Supports two execution paths:
-1. Local ML Agent Core (default): Zero-cost, in-memory Scikit-Learn intent classification,
-   entity/slot resolution, schema-aware SQL generation, and grounded response synthesis.
-2. External LLM Provider: Multi-turn tool-calling loop (OpenAI, Anthropic, Gemini, Ollama)
-   when an external provider with valid credentials is explicitly configured.
-"""
 from __future__ import annotations
 
 import json
@@ -76,20 +68,17 @@ def _execute_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _local_ml_agent_turn(session_id: str, message: str) -> Dict[str, Any]:
-    """Execute one turn using the in-memory Scikit-Learn ML Agent core."""
     session = get_session(session_id)
     entities = extract_entities(message, session)
     intent, confidence = predict_intent(message)
 
-    # Multi-turn context resolution for homework/assignment follow-ups
     if intent == "homework_assignment_pending" or entities.refers_to_multi_submission:
         if not entities.sections:
             if session.last_section_id == 2:
                 entities.sections.append(KNOWN_SECTIONS[1])
             else:
-                entities.sections.append(KNOWN_SECTIONS[0])  # Grade 9-A default
+                entities.sections.append(KNOWN_SECTIONS[0])
 
-    # Persist detected entities into conversational session state
     student_id = entities.students[0]["student_id"] if entities.students else None
     student_name = entities.students[0]["name"] if entities.students else None
     faculty_id = entities.faculty[0]["faculty_id"] if entities.faculty else None
@@ -114,16 +103,12 @@ def _local_ml_agent_turn(session_id: str, message: str) -> Dict[str, Any]:
         intent=intent,
     )
 
-    # Synthesize and execute verified read-only SQL
     sql_results, meta = synthesize_and_execute(intent, entities, message)
-
-    # Build grounded natural language response
     payload = build_response(intent, message, entities, sql_results, meta)
     payload["session_id"] = session_id
 
-    # If the response is a clarification or empty, consult the Full SQL Semantic Knowledge Base
     if not meta.get("out_of_scope") and not entities.is_out_of_scope and (
-        (payload.get("source_type") == "clarification" and "School Management AI Assistant" not in payload.get("answer", ""))
+        (payload.get("source_type") == "clarification" and "School Management" not in payload.get("answer", ""))
         or (payload.get("source_type") == "database" and not sql_results and "0" not in payload.get("answer", ""))
     ):
         from .semantic_engine import query_full_data_knowledge
@@ -133,36 +118,15 @@ def _local_ml_agent_turn(session_id: str, message: str) -> Dict[str, Any]:
             payload["answer"] = f"### {fact.title}\n\n{fact.text}"
             payload["source_type"] = "database"
 
-    # Generate Chain-of-Thought reasoning for transparency & autonomous thinking
-    from .thought_engine import AgentThoughtEngine
-    sql_plans = [r.get("sql", "") for r in sql_results if isinstance(r, dict) and r.get("sql")]
-    manual_sections = [m.get("section", "") for m in payload.get("manual_references", [])]
-    thought_trace = AgentThoughtEngine.generate_thought_trace(
-        query=message,
-        intent=intent,
-        confidence=confidence,
-        slots={
-            "student_name": student_name,
-            "faculty_name": faculty_name,
-            "section_name": section_full,
-            "class_name": class_name,
-            "subject_name": subject,
-            "date": entities.dates[0] if entities.dates else None,
-            "weekday": entities.weekdays[0] if entities.weekdays else None,
-            "low_threshold": entities.thresholds[0] if entities.thresholds else None,
-        },
-        source_type=payload.get("source_type", "database"),
-        sql_plans=sql_plans,
-        manual_sections=manual_sections,
-        session_id=session_id,
-    )
-    payload["thinking"] = thought_trace
+    payload["thinking"] = None
 
-    # Record message history in session
     update_session(
         session_id,
         user_message=message,
         assistant_message=payload["answer"],
+    )
+
+    return payload
     )
 
     return payload

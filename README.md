@@ -1,127 +1,113 @@
----
-title: School Management AI Assistant
-emoji: 🎓
-colorFrom: indigo
-colorTo: blue
-sdk: docker
-app_port: 7860
-pinned: false
----
+# School Management AI Assistant
 
-# School Management AI Chatbot
-
-An AI assistant that answers natural-language questions about a PostgreSQL school-management database. Every data answer is grounded in **live read-only SQL** executed against the `school` schema, and every workflow/constraint answer is grounded in the **School Management Database - User Manual**.
-
-Built with an **embedded Scikit-Learn ML Agent core (zero API keys and zero cost)**, with optional plug-and-play support for external cloud LLMs (OpenAI, Anthropic, Gemini, Ollama).
-
-Responses are labeled with their source (`Live Database Query`, `User Manual`, or `Database + User Manual`), show the exact SQL executed alongside returned rows in interactive data tables, and offer clickable follow-up suggestions.
+A full-stack conversational assistant designed for querying school management records and administrative workflows. The application answers natural-language questions grounded strictly in a PostgreSQL `school` database (29 relational tables, 4 reporting views) and the official system user manual.
 
 ---
 
-## Architecture
+## Features
 
+- **Grounded Database Answers**: Queries attendance, timetables, course assignments, homework submissions, exam scores, and leave requests via parameterized, read-only SQL queries.
+- **Conversational Memory**: Resolves multi-turn follow-up questions and pronouns (e.g., asking *"What is their Monday schedule?"* after querying a specific teacher or student).
+- **Administrative Manual Guidance**: Explains system workflows, leave approval steps, mark entries, and role permissions based on the system user manual.
+- **Data Protection Guardrails**: AST-level read-only query validator prevents data mutation (no `INSERT`, `UPDATE`, `DELETE`, or `DROP`), with automatic password masking.
+- **Zero API Key Requirement**: Built-in natural language classification and SQL synthesis runs locally out of the box with zero external API costs. Optional integration with external LLMs (OpenAI, Anthropic, Gemini, Ollama) is supported via environment configuration.
+- **Responsive Web Interface**: Mobile-first interface built with React and Tailwind CSS, featuring structured tables, attendance indicators, and suggested follow-ups.
+
+---
+
+## Project Structure
+
+```text
+├── backend/
+│   ├── app/
+│   │   ├── agent/             # Intent classification, entity extraction & query synthesis
+│   │   ├── config.py          # Application settings & environment variables
+│   │   ├── database.py        # PostgreSQL connection pool with read-only isolation
+│   │   ├── main.py            # FastAPI endpoints & static frontend serving
+│   │   ├── manual_loader.py   # Search and retrieval engine for the user manual
+│   │   ├── schemas.py         # Request and response models
+│   │   └── sql_validator.py   # Read-only SQL safety validator
+│   ├── data/
+│   │   ├── intent_model.joblib # Trained intent classifier
+│   │   └── manual_extracted.txt
+│   ├── scripts/
+│   │   ├── create_zip_package.py # Distribution packager
+│   │   ├── init_db.py           # Database schema & seed migrator
+│   │   └── verify_agent.py      # Automated 50-test verification suite
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── api/               # API client
+│   │   ├── components/        # React components (ChatWindow, Sidebar, MessageBubble, etc.)
+│   │   └── types.ts           # TypeScript interfaces
+│   ├── package.json
+│   └── vite.config.ts
+├── docker-compose.yml
+├── Dockerfile
+├── school_management_postgres92.sql # Database schema & seed records
+└── School Management Database - User Manual.pdf
 ```
-frontend (React 18 + TS + Vite + Tailwind CSS)
-   │  Served statically by FastAPI at / (in production) or via Vite dev proxy (/api/*)
-   ▼
-FastAPI backend (app/main.py)
-   ├── agent/
-   │    ├── ml_intent.py         Scikit-Learn TF-IDF + LogisticRegression intent classifier
-   │    ├── entity_extractor.py  Entity/slot extraction & conversational pronoun resolution
-   │    ├── sql_synthesizer.py   Schema-aware read-only SQL query synthesizer
-   │    ├── response_generator.py Grounded markdown builder with tables & citations
-   │    └── orchestrator.py      Multi-turn state tracking & hybrid provider router
-   ├── sql_validator.py          3-layer AST/token read-only guardrail
-   ├── database.py               psycopg3 pool: search_path=school, READ ONLY, 5s timeout
-   └── manual_loader.py          Indexes the 24-page User Manual (TF-IDF retrieval)
-   ▼
-PostgreSQL 16 `school` schema (29 tables, 4 reporting views, full seed data)
-```
 
 ---
 
-## 100% Free Remote Cloud Deployment Guide ($0/month)
+## Quick Start
 
-Deploy the entire full-stack application online completely free without credit cards:
+### Option 1: Docker (Recommended)
 
-### Step 1: Create Free Remote PostgreSQL Database (Neon.tech)
-1. Go to [Neon.tech](https://neon.tech) and create a free account.
-2. Create a project named `school_db`.
-3. Copy your PostgreSQL connection string (ensure `?sslmode=require` is at the end):
-   ```text
-   postgresql://username:password@ep-xyz.neon.tech/school_db?sslmode=require
-   ```
-4. Load the `school` schema (29 tables, 4 views, 8 users) into your remote Neon database in one command:
-   ```bash
-   python backend/scripts/init_db.py --db-url "postgresql://username:password@ep-xyz.neon.tech/school_db?sslmode=require"
-   ```
+Run the full-stack application (backend and built frontend) in a single container:
 
-### Step 2: Option A — Deploy on Hugging Face Spaces (Recommended: 16 GB RAM Free)
-1. Go to [Hugging Face Spaces](https://huggingface.co/spaces) and click **Create new Space**.
-2. Space name: `school-management-ai` | License: `mit` | SDK: **Docker** | Hardware: **Free (2 vCPU, 16 GB RAM)**.
-3. In **Settings > Variables and secrets**, add a new **Secret**:
-   - Name: `DATABASE_URL`
-   - Value: `postgresql://username:password@ep-xyz.neon.tech/school_db?sslmode=require`
-4. Push this repository to your Space:
-   ```bash
-   git remote add space https://huggingface.co/spaces/YOUR_USERNAME/school-management-ai
-   git push space main
-   ```
-5. Your Space builds automatically via the multi-stage `Dockerfile` and is live at `https://YOUR_USERNAME-school-management-ai.hf.space`!
-
-### Step 2: Option B — Deploy on Render.com
-1. Go to [Render.com](https://render.com) and create a new **Web Service**.
-2. Connect your Git repository.
-3. Select **Docker** environment.
-4. Set Environment Variables:
-   - `DATABASE_URL` = your Neon PostgreSQL connection string.
-   - `PORT` = `7860`
-   - `LLM_PROVIDER` = `local`
-5. Click **Create Web Service**. Render builds the multi-stage Docker container and provides an HTTPS URL.
-
----
-
-## Local Development Setup
-
-### 1. PostgreSQL Database
-Ensure PostgreSQL is running locally on port 5432:
 ```bash
-# Verify or bootstrap local database
-python backend/scripts/init_db.py
+docker compose up -d --build
 ```
 
-### 2. Backend Server
+The web application will be accessible at `http://localhost:8000`.
+
+### Option 2: Local Python Setup
+
+#### 1. Backend
+
 ```bash
-# Start FastAPI backend (serves API and local ML agent)
-python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
+# Install Python dependencies
+pip install -r backend/requirements.txt
+
+# Start the unified FastAPI server
+python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
 ```
 
-### 3. Frontend UI
+#### 2. Frontend Development (Optional)
+
+To run the Vite development server with hot module replacement:
+
 ```bash
 cd frontend
 npm install
-npm run dev        # http://localhost:5173
+npm run dev
 ```
-*Note: In production or when running via Docker, FastAPI serves the compiled frontend directly at `http://localhost:8000/`.*
+
+The Vite dev server runs at `http://localhost:5173` and proxies `/api` calls to the backend on port 8000.
 
 ---
 
-## Automated Verification Suite
+## Configuration
 
-Run the end-to-end test suite testing database ground truth, validator security, and 10 multi-turn manager chat queries:
+Set the following environment variables in a `.env` file or within your deployment environment:
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | Cloud PostgreSQL URL | Connection string for PostgreSQL database |
+| `DB_SCHEMA` | `school` | Target database schema |
+| `LLM_PROVIDER` | `local` | `local` (built-in, zero cost), `openai`, `gemini`, `anthropic`, or `ollama` |
+| `LLM_MODEL` | `scikit-learn-ml-agent` | Model identifier |
+| `PORT` | `8000` | Port for the web service |
+
+---
+
+## Verification & Testing
+
+The project includes an automated test suite verifying database ground truth, read-only safety guardrails, schema endpoints, and conversational query handling:
+
 ```bash
 python backend/scripts/verify_agent.py
 ```
-Expected output:
-```text
-SUMMARY: 50 passed, 0 failed, 0 blocked
-```
 
----
-
-## Safety & Security Model
-
-- **First Layer (Database Session)**: `default_transaction_read_only = on` and `statement_timeout = 5000` ms on every connection.
-- **Second Layer (SQL Validator)**: Only `SELECT`/`WITH...SELECT` statements are permitted. Mutating keywords (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`) are strictly blocked.
-- **Third Layer (Projection Masking)**: References to `password_hash` in the SELECT projection are replaced with `NULL AS password_hash` before execution, and the database driver replaces any sensitive credential strings with `***MASKED***`.
-- **Policy Enforcement**: Mutation requests (e.g., "Delete rejected leave requests") are refused with reference guidelines and SQL templates from the User Manual.
+Expected result: `50 passed, 0 failed, 0 blocked`.
